@@ -1,0 +1,2 @@
+[console_scripts]
+langtune-finetune = langtune.cli.finetune:main

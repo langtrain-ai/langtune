@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langtune"
+version = "0.1.0"
+description = "A package for finetuning text models."
+authors = [
+    { name = "Pritesh Raj", email = "priteshraj41@gmail.com" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=1.10",
+    "numpy",
+    "tqdm",
+    "pyyaml",
+    "scipy"
+]
+
+[project.urls]
+Homepage = "https://github.com/langtrain-ai/langtune"
+Documentation = "https://github.com/langtrain-ai/langtune/tree/main/docs"
+Source = "https://github.com/langtrain-ai/langtune"
+Tracker = "https://github.com/langtrain-ai/langtune/issues"
+
+[project.scripts]
+langtune-finetune = "langtune.cli.finetune:main"
+
+[bumpver]
+current_version = "0.1.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "Bump version: {old_version} → {new_version}"
+tag_message = "v{new_version}"

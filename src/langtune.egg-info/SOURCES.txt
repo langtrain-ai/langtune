@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+src/langtune/__init__.py
+src/langtune.egg-info/PKG-INFO
+src/langtune.egg-info/SOURCES.txt
+src/langtune.egg-info/dependency_links.txt
+src/langtune.egg-info/entry_points.txt
+src/langtune.egg-info/requires.txt
+src/langtune.egg-info/top_level.txt
