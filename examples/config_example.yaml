@@ -1,0 +1,59 @@
+# Example configuration file for Langtune
+# This file demonstrates all available configuration options
+
+# Model architecture configuration
+model:
+  vocab_size: 10000
+  embed_dim: 256
+  num_layers: 6
+  num_heads: 8
+  max_seq_len: 512
+  mlp_ratio: 4.0
+  dropout: 0.1
+  
+  # LoRA configuration
+  lora:
+    rank: 8
+    alpha: 16.0
+    dropout: 0.1
+    target_modules:
+      - "attention.qkv"
+      - "attention.proj"
+      - "mlp.fc1"
+      - "mlp.fc2"
+    merge_weights: false
+
+# Training configuration
+training:
+  batch_size: 16
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  num_epochs: 5
+  warmup_steps: 100
+  max_grad_norm: 1.0
+  gradient_accumulation_steps: 1
+  mixed_precision: false
+  save_steps: 500
+  eval_steps: 250
+  logging_steps: 50
+  save_total_limit: 3
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.001
+
+# Data configuration
+data:
+  train_file: null  # Path to training data file (null for sample data)
+  eval_file: null   # Path to evaluation data file (null for auto-split)
+  test_file: null   # Path to test data file (null for auto-split)
+  max_length: 512
+  padding: "max_length"
+  truncation: true
+  tokenizer_name: null  # Name of tokenizer to use (null for simple tokenizer)
+  cache_dir: null
+
+# General configuration
+output_dir: "./outputs/example_training"
+seed: 42
+device: "auto"  # auto, cpu, cuda, mps
+num_workers: 2
+pin_memory: true

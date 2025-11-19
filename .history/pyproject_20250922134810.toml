@@ -17,8 +17,7 @@ dependencies = [
     "numpy",
     "tqdm",
     "pyyaml",
-    "scipy",
-    "wandb"
+    "scipy"
 ]
 
 [project.urls]
