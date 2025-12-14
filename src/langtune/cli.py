@@ -536,6 +536,18 @@ Learn more: https://github.com/langtrain-ai/langtune
     train_parser.add_argument('--epochs', type=int, help='Number of epochs')
     train_parser.add_argument('--resume-from', type=str, help='Resume from checkpoint')
     
+    # Optimization flags
+    train_parser.add_argument('--fast', action='store_true', 
+                             help='Use FastLoRALanguageModel with all optimizations (RoPE, flash attention, grad checkpointing)')
+    train_parser.add_argument('--4bit', dest='use_4bit', action='store_true',
+                             help='Use 4-bit quantization (QLoRA style)')
+    train_parser.add_argument('--gradient-checkpointing', action='store_true',
+                             help='Enable gradient checkpointing to reduce memory')
+    train_parser.add_argument('--mixed-precision', type=str, choices=['fp16', 'bf16', 'fp32'], 
+                             default='fp16', help='Mixed precision training mode')
+    train_parser.add_argument('--gradient-accumulation', type=int, default=1,
+                             help='Number of gradient accumulation steps')
+    
     # Evaluate command
     eval_parser = subparsers.add_parser('evaluate', help='Evaluate a trained model')
     eval_parser.add_argument('--config', type=str, required=True, help='Path to configuration file')

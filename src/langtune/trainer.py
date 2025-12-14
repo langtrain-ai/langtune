@@ -480,9 +480,318 @@ class Trainer:
                 top_p=0.9
             )
         
-        # Simple decoding
+    # Simple decoding
         generated_text = "".join([chr(i) for i in generated[0].cpu().tolist()])
         return generated_text
+
+
+class FastTrainer:
+    """
+    Optimized trainer with:
+    - Gradient accumulation for effective larger batches
+    - Enhanced mixed precision training
+    - Memory monitoring and optimization
+    - Support for FastLoRALanguageModel
+    """
+    
+    def __init__(
+        self,
+        model: nn.Module,
+        config: Config,
+        train_dataloader: DataLoader,
+        val_dataloader: Optional[DataLoader] = None,
+        test_dataloader: Optional[DataLoader] = None,
+        gradient_accumulation_steps: int = 4,
+        mixed_precision: str = "fp16"  # fp16, bf16, or fp32
+    ):
+        self.model = model
+        self.config = config
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.test_dataloader = test_dataloader
+        self.gradient_accumulation_steps = gradient_accumulation_steps
+        
+        # Setup device
+        self.device = self._setup_device()
+        self.model.to(self.device)
+        
+        # Freeze base model if using FastLoRALanguageModel
+        if hasattr(self.model, 'freeze_base_model'):
+            self.model.freeze_base_model()
+        
+        # Setup mixed precision
+        self.mixed_precision = mixed_precision
+        self._setup_amp()
+        
+        # Setup optimizer (only trainable params)
+        self.optimizer = self._setup_optimizer()
+        self.scheduler = self._setup_scheduler()
+        
+        # Utilities
+        self.metrics_tracker = MetricsTracker()
+        self.early_stopping = EarlyStopping(
+            patience=config.training.early_stopping_patience,
+            threshold=config.training.early_stopping_threshold
+        )
+        self.checkpointer = ModelCheckpoint(
+            save_dir=config.output_dir,
+            save_total_limit=config.training.save_total_limit,
+            monitor="val_loss"
+        )
+        
+        # Setup logging
+        self._setup_logging()
+        
+        # Log configuration
+        self._log_training_info()
+    
+    def _setup_device(self) -> torch.device:
+        if self.config.device == "auto":
+            if torch.cuda.is_available():
+                return torch.device("cuda")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                return torch.device("mps")
+            else:
+                return torch.device("cpu")
+        return torch.device(self.config.device)
+    
+    def _setup_amp(self):
+        """Setup automatic mixed precision."""
+        try:
+            from .optimizations import MixedPrecisionTrainer
+            
+            if self.mixed_precision == "bf16":
+                dtype = torch.bfloat16
+            elif self.mixed_precision == "fp16":
+                dtype = torch.float16
+            else:
+                dtype = torch.float32
+            
+            self.amp_trainer = MixedPrecisionTrainer(
+                enabled=(self.mixed_precision != "fp32" and self.device.type == "cuda"),
+                dtype=dtype
+            )
+        except ImportError:
+            # Fallback to standard scaler
+            self.amp_trainer = None
+            self.scaler = torch.cuda.amp.GradScaler() if self.device.type == "cuda" else None
+    
+    def _setup_optimizer(self):
+        """Setup optimizer for trainable parameters only."""
+        trainable_params = [p for p in self.model.parameters() if p.requires_grad]
+        
+        if len(trainable_params) == 0:
+            logger.warning("No trainable parameters found! Check model configuration.")
+            trainable_params = list(self.model.parameters())
+        
+        logger.info(f"Optimizing {len(trainable_params)} parameter groups")
+        
+        return AdamW(
+            trainable_params,
+            lr=self.config.training.learning_rate,
+            weight_decay=self.config.training.weight_decay
+        )
+    
+    def _setup_scheduler(self):
+        steps_per_epoch = len(self.train_dataloader) // self.gradient_accumulation_steps
+        total_steps = steps_per_epoch * self.config.training.num_epochs
+        
+        if self.config.training.warmup_steps > 0:
+            return OneCycleLR(
+                self.optimizer,
+                max_lr=self.config.training.learning_rate,
+                total_steps=total_steps,
+                pct_start=self.config.training.warmup_steps / max(total_steps, 1)
+            )
+        return CosineAnnealingLR(self.optimizer, T_max=total_steps)
+    
+    def _setup_logging(self):
+        try:
+            wandb.init(
+                project="langtune-fast",
+                config={
+                    "gradient_accumulation": self.gradient_accumulation_steps,
+                    "mixed_precision": self.mixed_precision,
+                    **({k: v for k, v in self.config.__dict__.items() if not k.startswith('_')})
+                },
+                name=f"fast_run_{int(time.time())}"
+            )
+            self.use_wandb = True
+        except:
+            self.use_wandb = False
+    
+    def _log_training_info(self):
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        
+        logger.info(f"FastTrainer initialized on {self.device}")
+        logger.info(f"Total parameters: {total_params:,}")
+        logger.info(f"Trainable parameters: {trainable_params:,} ({100*trainable_params/total_params:.2f}%)")
+        logger.info(f"Gradient accumulation: {self.gradient_accumulation_steps}")
+        logger.info(f"Mixed precision: {self.mixed_precision}")
+        logger.info(f"Effective batch size: {self.config.training.batch_size * self.gradient_accumulation_steps}")
+    
+    def _log_memory(self, prefix: str = ""):
+        if self.device.type == "cuda":
+            try:
+                from .optimizations import log_memory_usage
+                log_memory_usage(prefix)
+            except ImportError:
+                allocated = torch.cuda.memory_allocated() / 1e9
+                logger.info(f"{prefix}GPU Memory: {allocated:.2f} GB")
+    
+    def train_epoch(self, epoch: int) -> Dict[str, float]:
+        self.model.train()
+        total_loss = 0.0
+        num_steps = 0
+        accumulated_loss = 0.0
+        
+        progress_bar = tqdm(
+            self.train_dataloader,
+            desc=f"Epoch {epoch+1}/{self.config.training.num_epochs}",
+            leave=False
+        )
+        
+        self.optimizer.zero_grad()
+        
+        for batch_idx, batch in enumerate(progress_bar):
+            batch = {k: v.to(self.device) for k, v in batch.items()}
+            
+            # Forward with AMP
+            if self.amp_trainer:
+                with self.amp_trainer.autocast_context:
+                    outputs = self.model(**batch)
+                    loss = outputs["loss"] / self.gradient_accumulation_steps
+                
+                # Scale and backward
+                scaled_loss = self.amp_trainer.scale_loss(loss)
+                scaled_loss.backward()
+            else:
+                outputs = self.model(**batch)
+                loss = outputs["loss"] / self.gradient_accumulation_steps
+                loss.backward()
+            
+            accumulated_loss += loss.item()
+            
+            # Optimizer step after accumulation
+            if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
+                # Gradient clipping
+                if self.config.training.max_grad_norm > 0:
+                    if self.amp_trainer:
+                        self.amp_trainer.unscale_gradients(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        self.config.training.max_grad_norm
+                    )
+                
+                # Step
+                if self.amp_trainer:
+                    self.amp_trainer.step(self.optimizer)
+                else:
+                    self.optimizer.step()
+                
+                if self.scheduler:
+                    self.scheduler.step()
+                
+                self.optimizer.zero_grad()
+                
+                # Track
+                step_loss = accumulated_loss * self.gradient_accumulation_steps
+                total_loss += step_loss
+                num_steps += 1
+                accumulated_loss = 0.0
+                
+                progress_bar.set_postfix({"loss": f"{step_loss:.4f}"})
+                
+                # Log periodically
+                if num_steps % (self.config.training.logging_steps // self.gradient_accumulation_steps + 1) == 0:
+                    lr = self.optimizer.param_groups[0]['lr']
+                    metrics = {"train_loss": step_loss, "learning_rate": lr, "epoch": epoch}
+                    self.metrics_tracker.update(metrics)
+                    if self.use_wandb:
+                        wandb.log(metrics)
+        
+        # Handle remaining batches
+        if accumulated_loss > 0:
+            if self.amp_trainer:
+                self.amp_trainer.step(self.optimizer)
+            else:
+                self.optimizer.step()
+            self.optimizer.zero_grad()
+        
+        self._log_memory(f"Epoch {epoch+1} end - ")
+        
+        return {"train_loss": total_loss / max(num_steps, 1)}
+    
+    def validate(self, epoch: int) -> Dict[str, float]:
+        if self.val_dataloader is None:
+            return {}
+        
+        self.model.eval()
+        total_loss = 0.0
+        num_batches = 0
+        
+        with torch.no_grad():
+            for batch in tqdm(self.val_dataloader, desc="Validation", leave=False):
+                batch = {k: v.to(self.device) for k, v in batch.items()}
+                
+                if self.amp_trainer:
+                    with self.amp_trainer.autocast_context:
+                        outputs = self.model(**batch)
+                else:
+                    outputs = self.model(**batch)
+                
+                total_loss += outputs["loss"].item()
+                num_batches += 1
+        
+        return {"val_loss": total_loss / max(num_batches, 1)}
+    
+    def train(self, resume_from_checkpoint: Optional[str] = None):
+        start_epoch = 0
+        
+        if resume_from_checkpoint:
+            start_epoch, _ = self.checkpointer.load(
+                self.model, self.optimizer, self.scheduler, resume_from_checkpoint
+            )
+            logger.info(f"Resumed from epoch {start_epoch}")
+        
+        logger.info("Starting optimized training...")
+        self._log_memory("Training start - ")
+        
+        for epoch in range(start_epoch, self.config.training.num_epochs):
+            train_metrics = self.train_epoch(epoch)
+            val_metrics = self.validate(epoch)
+            
+            all_metrics = {**train_metrics, **val_metrics}
+            self.metrics_tracker.update(all_metrics)
+            epoch_metrics = self.metrics_tracker.log_epoch()
+            
+            if self.use_wandb:
+                wandb.log(epoch_metrics)
+            
+            self.checkpointer.save(self.model, self.optimizer, self.scheduler, epoch, all_metrics)
+            
+            if val_metrics and "val_loss" in val_metrics:
+                if self.early_stopping(val_metrics["val_loss"]):
+                    logger.info(f"Early stopping at epoch {epoch+1}")
+                    break
+            
+            logger.info(
+                f"Epoch {epoch+1} - Train: {train_metrics['train_loss']:.4f}, "
+                f"Val: {val_metrics.get('val_loss', 'N/A')}"
+            )
+        
+        logger.info("Training completed!")
+        self._log_memory("Training end - ")
+        
+        # Cleanup
+        try:
+            from .optimizations import cleanup_memory
+            cleanup_memory()
+        except ImportError:
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
+
 
 def create_trainer(
     config: Config,
@@ -524,3 +833,57 @@ def create_trainer(
     )
     
     return trainer
+
+
+def create_fast_trainer(
+    config: Config,
+    train_dataloader: DataLoader,
+    val_dataloader: Optional[DataLoader] = None,
+    test_dataloader: Optional[DataLoader] = None,
+    gradient_accumulation_steps: int = 4,
+    mixed_precision: str = "fp16"
+) -> FastTrainer:
+    """
+    Create an optimized FastTrainer instance with FastLoRALanguageModel.
+    
+    Args:
+        config: Training configuration
+        train_dataloader: Training data loader
+        val_dataloader: Validation data loader (optional)
+        test_dataloader: Test data loader (optional)
+        gradient_accumulation_steps: Steps to accumulate gradients
+        mixed_precision: "fp16", "bf16", or "fp32"
+        
+    Returns:
+        FastTrainer instance
+    """
+    from .models import FastLoRALanguageModel
+    
+    # Create optimized model
+    model = FastLoRALanguageModel(
+        vocab_size=config.model.vocab_size,
+        embed_dim=config.model.embed_dim,
+        num_layers=config.model.num_layers,
+        num_heads=config.model.num_heads,
+        max_seq_len=config.model.max_seq_len,
+        mlp_ratio=config.model.mlp_ratio,
+        dropout=config.model.dropout,
+        lora_config=config.model.lora.__dict__ if config.model.lora else None,
+        use_rope=True,
+        use_flash_attention=True,
+        use_gradient_checkpointing=True
+    )
+    
+    # Create fast trainer
+    trainer = FastTrainer(
+        model=model,
+        config=config,
+        train_dataloader=train_dataloader,
+        val_dataloader=val_dataloader,
+        test_dataloader=test_dataloader,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        mixed_precision=mixed_precision
+    )
+    
+    return trainer
+

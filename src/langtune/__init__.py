@@ -107,7 +107,16 @@ if sys.stdout.isatty():
 # Core models
 from .models import (
     LoRALanguageModel, LoRALinear, MultiHeadAttention, TransformerBlock,
+    FastLoRALanguageModel, FastMultiHeadAttention, FastTransformerBlock,
     RLHF, CoT, CCoT, GRPO, RLVR, DPO, PPO, LIME, SHAP
+)
+
+# Optimizations
+from .optimizations import (
+    OptimizationConfig, QuantizedLinear, LoRALinear4bit,
+    RotaryPositionEmbedding, MemoryEfficientAttention,
+    fused_cross_entropy, checkpoint, MixedPrecisionTrainer,
+    get_memory_stats, cleanup_memory
 )
 
 # Configuration
@@ -125,7 +134,8 @@ from .data import (
 
 # Training
 from .trainer import (
-    Trainer, EarlyStopping, MetricsTracker, ModelCheckpoint, create_trainer
+    Trainer, FastTrainer, EarlyStopping, MetricsTracker, ModelCheckpoint,
+    create_trainer, create_fast_trainer
 )
 
 # Utilities
@@ -150,7 +160,14 @@ from .cli import main
 __all__ = [
     # Models
     "LoRALanguageModel", "LoRALinear", "MultiHeadAttention", "TransformerBlock",
+    "FastLoRALanguageModel", "FastMultiHeadAttention", "FastTransformerBlock",
     "RLHF", "CoT", "CCoT", "GRPO", "RLVR", "DPO", "PPO", "LIME", "SHAP",
+    
+    # Optimizations
+    "OptimizationConfig", "QuantizedLinear", "LoRALinear4bit",
+    "RotaryPositionEmbedding", "MemoryEfficientAttention",
+    "fused_cross_entropy", "checkpoint", "MixedPrecisionTrainer",
+    "get_memory_stats", "cleanup_memory",
     
     # Configuration
     "Config", "ModelConfig", "TrainingConfig", "DataConfig", "LoRAConfig",
@@ -162,7 +179,8 @@ __all__ = [
     "SimpleTokenizer", "create_sample_dataset", "load_dataset_from_config",
     
     # Training
-    "Trainer", "EarlyStopping", "MetricsTracker", "ModelCheckpoint", "create_trainer",
+    "Trainer", "FastTrainer", "EarlyStopping", "MetricsTracker", "ModelCheckpoint",
+    "create_trainer", "create_fast_trainer",
     
     # Utilities
     "set_seed", "get_device", "count_parameters", "count_lora_parameters",
