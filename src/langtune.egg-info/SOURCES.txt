@@ -2,6 +2,15 @@ LICENSE
 README.md
 pyproject.toml
 src/langtune/__init__.py
+src/langtune/auth.py
+src/langtune/cli.py
+src/langtune/config.py
+src/langtune/data.py
+src/langtune/models.py
+src/langtune/optimizations.py
+src/langtune/py.typed
+src/langtune/trainer.py
+src/langtune/utils.py
 src/langtune.egg-info/PKG-INFO
 src/langtune.egg-info/SOURCES.txt
 src/langtune.egg-info/dependency_links.txt

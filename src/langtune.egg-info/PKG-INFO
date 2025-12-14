@@ -1,8 +1,9 @@
 Metadata-Version: 2.4
 Name: langtune
-Version: 0.1.1
-Summary: A package for finetuning text models.
+Version: 0.1.2
+Summary: Efficient LoRA Fine-Tuning for Large Language Models - Train smarter, not harder.
 Author-email: Pritesh Raj <priteshraj41@gmail.com>
+Maintainer-email: Langtrain AI <contact@langtrain.ai>
 License: MIT License
         
         Copyright (c) 2025 Pritesh Raj
@@ -27,8 +28,24 @@ License: MIT License
         
 Project-URL: Homepage, https://github.com/langtrain-ai/langtune
 Project-URL: Documentation, https://github.com/langtrain-ai/langtune/tree/main/docs
-Project-URL: Source, https://github.com/langtrain-ai/langtune
-Project-URL: Tracker, https://github.com/langtrain-ai/langtune/issues
+Project-URL: Repository, https://github.com/langtrain-ai/langtune
+Project-URL: Changelog, https://github.com/langtrain-ai/langtune/blob/main/CHANGELOG.md
+Project-URL: Bug Tracker, https://github.com/langtrain-ai/langtune/issues
+Keywords: llm,lora,fine-tuning,machine-learning,deep-learning,transformers,nlp,language-model,pytorch,rlhf,dpo,ppo
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Typing :: Typed
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -37,6 +54,20 @@ Requires-Dist: numpy
 Requires-Dist: tqdm
 Requires-Dist: pyyaml
 Requires-Dist: scipy
+Requires-Dist: wandb
+Requires-Dist: rich>=13.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Provides-Extra: all
+Requires-Dist: transformers; extra == "all"
+Requires-Dist: datasets; extra == "all"
+Requires-Dist: accelerate; extra == "all"
+Requires-Dist: bitsandbytes; extra == "all"
 Dynamic: license-file
 
 # Langtune: Efficient LoRA Fine-Tuning for Text LLMs
@@ -82,6 +113,7 @@ Dynamic: license-file
 - [Why langtune?](#why-langtune)
 - [Architecture Overview](#architecture-overview)
 - [Core Modules](#core-modules)
+- [LLM Concepts Supported](#llm-concepts-supported)
 - [Performance & Efficiency](#performance--efficiency)
 - [Advanced Configuration](#advanced-configuration)
 - [Documentation & Resources](#documentation--resources)
@@ -209,6 +241,26 @@ flowchart TD
 | MLPHead | Output projection layer | Classification, regression, dropout |
 | Config System | Centralized configuration | YAML/JSON config, CLI overrides |
 | Data Utils | Preprocessing and augmentation | Built-in tokenization, custom loaders |
+
+---
+
+## LLM Concepts Supported
+
+Langtune provides stubs and extensibility for a variety of advanced LLM concepts and techniques:
+
+| Concept | Full Name | Description |
+|---------|-----------|-------------|
+| RLHF    | Reinforcement Learning from Human Feedback | Fine-tuning models using human feedback, often via reward modeling and RL. |
+| CoT     | Chain-of-Thought | Encourages models to generate intermediate reasoning steps for complex tasks. |
+| CCoT    | Contrastive Chain-of-Thought | Uses contrastive learning to distinguish correct vs. incorrect reasoning chains. |
+| GRPO    | Generalized Reinforcement Policy Optimization | Generalizes RL policy optimization methods like PPO and DPO. |
+| RLVR    | Reinforcement Learning with Value Ranking | Uses value ranking to guide RL, often for preference-based optimization. |
+| DPO     | Direct Preference Optimization | Aligns models directly with human preferences using pairwise comparisons. |
+| PPO     | Proximal Policy Optimization | RL algorithm balancing exploration and exploitation with stable updates. |
+| LIME    | Local Interpretable Model-agnostic Explanations | Explains model predictions by locally approximating with interpretable models. |
+| SHAP    | SHapley Additive exPlanations | Explains model outputs using Shapley values from game theory. |
+
+These concepts are available as stubs in the codebase and can be extended for research and experimentation.
 
 ---
 

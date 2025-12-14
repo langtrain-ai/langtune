@@ -74,7 +74,7 @@ def encode_text(text: str, tokenizer=None) -> List[int]:
     """
     if tokenizer:
         if hasattr(tokenizer, 'encode'):
-        return tokenizer.encode(text)
+            return tokenizer.encode(text)
         elif callable(tokenizer):
             return tokenizer(text)
         else:
