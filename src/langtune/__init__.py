@@ -32,9 +32,23 @@ def _show_welcome_banner():
         
         console = Console()
         
-        # Check GPU availability
+        # Check GPU availability with detailed NVIDIA info
         if torch.cuda.is_available():
-            gpu_info = f"✓ GPU: {torch.cuda.get_device_name(0)}"
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_count = torch.cuda.device_count()
+            
+            # Get NVIDIA-specific details
+            try:
+                gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                cuda_version = torch.version.cuda
+                
+                if gpu_count > 1:
+                    gpu_info = f"✓ GPU: {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each, CUDA {cuda_version})"
+                else:
+                    gpu_info = f"✓ GPU: {gpu_name} ({gpu_memory:.0f}GB, CUDA {cuda_version})"
+            except:
+                gpu_info = f"✓ GPU: {gpu_name}"
+            
             gpu_style = "green"
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             gpu_info = "✓ GPU: Apple Silicon (MPS)"

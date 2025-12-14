@@ -373,13 +373,30 @@ def concept_command(args):
 def version_command(args):
     """Handle the version command."""
     if RICH_AVAILABLE:
-        # Check GPU availability
+        # Check GPU availability with detailed NVIDIA info
         if torch.cuda.is_available():
-            gpu_info = f"[green]✓ {torch.cuda.get_device_name(0)}[/]"
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_count = torch.cuda.device_count()
+            
+            try:
+                gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                cuda_version = torch.version.cuda
+                
+                if gpu_count > 1:
+                    gpu_info = f"[green]✓ {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each)[/]"
+                else:
+                    gpu_info = f"[green]✓ {gpu_name} ({gpu_memory:.0f}GB)[/]"
+                
+                cuda_info = f"{cuda_version}"
+            except:
+                gpu_info = f"[green]✓ {gpu_name}[/]"
+                cuda_info = "Available"
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             gpu_info = "[green]✓ Apple Silicon (MPS)[/]"
+            cuda_info = "N/A (Metal)"
         else:
             gpu_info = "[yellow]○ Not available (CPU mode)[/]"
+            cuda_info = "No"
         
         table = Table(title="Langtune System Info", box=box.ROUNDED, title_style="bold magenta")
         table.add_column("Component", style="cyan", no_wrap=True)
@@ -389,7 +406,7 @@ def version_command(args):
         table.add_row("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
         table.add_row("PyTorch Version", torch.__version__)
         table.add_row("GPU Status", gpu_info)
-        table.add_row("CUDA Available", "Yes" if torch.cuda.is_available() else "No")
+        table.add_row("CUDA Version", cuda_info)
         
         console.print()
         console.print(table)
