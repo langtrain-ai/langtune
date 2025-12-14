@@ -193,6 +193,11 @@ from .trainer import (
     create_trainer, create_fast_trainer
 )
 
+# Fine-tuning (best-practice API)
+from .finetune import (
+    finetune, finetune_from_config, FineTuneConfig, train, fine_tune
+)
+
 # Utilities
 from .utils import (
     set_seed, get_device, count_parameters, count_lora_parameters,
@@ -236,6 +241,9 @@ __all__ = [
     # Training
     "Trainer", "FastTrainer", "EarlyStopping", "MetricsTracker", "ModelCheckpoint",
     "create_trainer", "create_fast_trainer",
+    
+    # Fine-tuning
+    "finetune", "finetune_from_config", "FineTuneConfig", "train", "fine_tune",
     
     # Utilities
     "set_seed", "get_device", "count_parameters", "count_lora_parameters",
