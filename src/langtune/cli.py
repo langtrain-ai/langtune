@@ -14,6 +14,10 @@ from .config import Config, load_config, save_config, get_preset_config, validat
 from .trainer import create_trainer
 from .data import load_dataset_from_config, create_data_loader, DataCollator
 from .models import LoRALanguageModel
+from .auth import (
+    get_api_key, verify_api_key, check_usage, interactive_login, logout,
+    print_usage_info, AuthenticationError, UsageLimitError, require_auth
+)
 
 # Try to import rich for beautiful output
 try:
@@ -39,8 +43,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def _check_auth():
+    """Check authentication before running protected commands."""
+    api_key = get_api_key()
+    
+    if not api_key:
+        if RICH_AVAILABLE:
+            console.print("\n[bold red]🔐 Authentication Required[/]\n")
+            console.print("Langtune requires an API key to run. Get your free key at:")
+            console.print("[blue underline]https://langtrain.xyz/dashboard[/]\n")
+            console.print("Then authenticate with: [cyan]langtune auth login[/]\n")
+        else:
+            print("\n🔐 Authentication Required\n")
+            print("Get your API key at: https://langtrain.xyz/dashboard")
+            print("Then run: langtune auth login\n")
+        return False
+    
+    try:
+        usage = check_usage(api_key)
+        if RICH_AVAILABLE:
+            remaining = f"{usage['tokens_remaining']:,}"
+            console.print(f"[dim]Tokens remaining: {remaining}[/]")
+        return True
+    except AuthenticationError as e:
+        if RICH_AVAILABLE:
+            console.print(f"[red]❌ {e}[/]")
+        else:
+            print(f"❌ {e}")
+        return False
+    except UsageLimitError as e:
+        if RICH_AVAILABLE:
+            console.print(f"[yellow]⚠️ {e}[/]")
+        else:
+            print(f"⚠️ {e}")
+        return False
+
+
 def train_command(args):
     """Handle the train command."""
+    # Check authentication first
+    if not _check_auth():
+        return 1
+    
     logger.info("Starting training...")
     
     # Load configuration
@@ -142,6 +186,10 @@ def train_command(args):
 
 def evaluate_command(args):
     """Handle the evaluate command."""
+    # Check authentication first
+    if not _check_auth():
+        return 1
+    
     logger.info("Starting evaluation...")
     
     if not args.model_path:
@@ -217,6 +265,10 @@ def evaluate_command(args):
 
 def generate_command(args):
     """Handle the generate command."""
+    # Check authentication first
+    if not _check_auth():
+        return 1
+    
     logger.info("Starting text generation...")
     
     if not args.model_path:
@@ -458,6 +510,13 @@ Learn more: https://github.com/langtrain-ai/langtune
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
+    # Auth command
+    auth_parser = subparsers.add_parser('auth', help='Manage API key authentication')
+    auth_subparsers = auth_parser.add_subparsers(dest='auth_command', help='Auth commands')
+    auth_subparsers.add_parser('login', help='Login with your API key')
+    auth_subparsers.add_parser('logout', help='Remove stored API key')
+    auth_subparsers.add_parser('status', help='Show authentication status and usage')
+    
     # Version command
     subparsers.add_parser('version', help='Show version and system information')
     
@@ -512,7 +571,30 @@ Learn more: https://github.com/langtrain-ai/langtune
         return 1
     
     # Route to appropriate command handler
-    if args.command == 'version':
+    if args.command == 'auth':
+        if not args.auth_command:
+            # Show auth help
+            if RICH_AVAILABLE:
+                console.print("\n[bold cyan]🔐 Authentication Commands[/]\n")
+                console.print("  [cyan]langtune auth login[/]   - Login with your API key")
+                console.print("  [cyan]langtune auth logout[/]  - Remove stored API key")
+                console.print("  [cyan]langtune auth status[/]  - Show auth status and usage\n")
+                console.print("[dim]Get your API key at:[/] [blue underline]https://langtrain.xyz/dashboard[/]\n")
+            else:
+                print("\nAuthentication Commands:\n")
+                print("  langtune auth login   - Login with your API key")
+                print("  langtune auth logout  - Remove stored API key")
+                print("  langtune auth status  - Show auth status and usage\n")
+            return 0
+        elif args.auth_command == 'login':
+            return 0 if interactive_login() else 1
+        elif args.auth_command == 'logout':
+            logout()
+            return 0
+        elif args.auth_command == 'status':
+            print_usage_info()
+            return 0
+    elif args.command == 'version':
         return version_command(args)
     elif args.command == 'info':
         return info_command(args)

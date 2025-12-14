@@ -69,7 +69,9 @@ def _show_welcome_banner():
         # Quick start
         banner_text.append("\n  🚀 ", style="")
         banner_text.append("Quick Start:\n", style="bold")
-        banner_text.append("     langtune train --preset small --train-file data.txt\n", style="cyan")
+        banner_text.append("     1. langtune auth login      ", style="cyan")
+        banner_text.append("# Get key at langtrain.xyz\n", style="dim")
+        banner_text.append("     2. langtune train --preset small --train-file data.txt\n", style="cyan")
         
         # Tips
         banner_text.append("\n  💡 ", style="")
@@ -87,10 +89,11 @@ def _show_welcome_banner():
 ╚═══════════════════════════════════════════════════════════╝
 
   📦 Version: v{__version__}
-  📚 Docs: https://github.com/langtrain-ai/langtune
+  📚 Docs: https://langtrain.xyz
 
   🚀 Quick Start:
-     langtune train --preset small --train-file data.txt
+     1. langtune auth login                      # Get key at langtrain.xyz
+     2. langtune train --preset small --train-file data.txt
 
   💡 Tip: Set LANGTUNE_NO_BANNER=1 to disable this message
 """)
@@ -134,6 +137,13 @@ from .utils import (
     save_model_info, load_model_info, log_gpu_memory, cleanup_gpu_memory
 )
 
+# Authentication
+from .auth import (
+    get_api_key, set_api_key, verify_api_key, check_usage,
+    interactive_login, logout, print_usage_info,
+    AuthenticationError, UsageLimitError, require_auth
+)
+
 # CLI
 from .cli import main
 
@@ -161,10 +171,16 @@ __all__ = [
     "format_time", "format_size", "get_model_size", "print_model_summary",
     "save_model_info", "load_model_info", "log_gpu_memory", "cleanup_gpu_memory",
     
+    # Authentication
+    "get_api_key", "set_api_key", "verify_api_key", "check_usage",
+    "interactive_login", "logout", "print_usage_info",
+    "AuthenticationError", "UsageLimitError", "require_auth",
+    
     # CLI
     "main",
     
     # Version
     "__version__"
 ]
+
 
