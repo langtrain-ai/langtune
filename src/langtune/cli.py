@@ -15,6 +15,23 @@ from .trainer import create_trainer
 from .data import load_dataset_from_config, create_data_loader, DataCollator
 from .models import LoRALanguageModel
 
+# Try to import rich for beautiful output
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+    from rich.table import Table
+    from rich import box
+    from rich.text import Text
+    RICH_AVAILABLE = True
+    console = Console()
+except ImportError:
+    RICH_AVAILABLE = False
+    console = None
+
+# Version
+__version__ = "0.1.2"
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -269,17 +286,154 @@ def generate_command(args):
 def concept_command(args):
     """Handle the concept command."""
     concept_name = args.concept.upper()
-    logger.info(f"Running concept demonstration: {concept_name}")
     
-    # Simulate concept execution
+    if RICH_AVAILABLE:
+        console.print(f"\n[bold cyan]🧪 Running concept demonstration:[/] [bold magenta]{concept_name}[/]\n")
+    else:
+        logger.info(f"Running concept demonstration: {concept_name}")
+    
+    # Simulate concept execution with rich progress
     import time
-    from tqdm import tqdm
     
-    for i in tqdm(range(100), desc=f"Progress for {concept_name}"):
-        time.sleep(0.02)  # Simulate work
+    if RICH_AVAILABLE:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Processing {concept_name}...", total=100)
+            for i in range(100):
+                time.sleep(0.02)
+                progress.update(task, advance=1)
+        
+        console.print(f"\n[bold green]✓[/] {concept_name} demonstration completed!\n")
+    else:
+        from tqdm import tqdm
+        for i in tqdm(range(100), desc=f"Progress for {concept_name}"):
+            time.sleep(0.02)
+        logger.info(f"{concept_name} demonstration completed!")
     
-    logger.info(f"{concept_name} demonstration completed!")
     return 0
+
+
+def version_command(args):
+    """Handle the version command."""
+    if RICH_AVAILABLE:
+        # Check GPU availability
+        if torch.cuda.is_available():
+            gpu_info = f"[green]✓ {torch.cuda.get_device_name(0)}[/]"
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            gpu_info = "[green]✓ Apple Silicon (MPS)[/]"
+        else:
+            gpu_info = "[yellow]○ Not available (CPU mode)[/]"
+        
+        table = Table(title="Langtune System Info", box=box.ROUNDED, title_style="bold magenta")
+        table.add_column("Component", style="cyan", no_wrap=True)
+        table.add_column("Value", style="white")
+        
+        table.add_row("Langtune Version", f"v{__version__}")
+        table.add_row("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        table.add_row("PyTorch Version", torch.__version__)
+        table.add_row("GPU Status", gpu_info)
+        table.add_row("CUDA Available", "Yes" if torch.cuda.is_available() else "No")
+        
+        console.print()
+        console.print(table)
+        console.print()
+    else:
+        print(f"Langtune v{__version__}")
+        print(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        print(f"PyTorch {torch.__version__}")
+        print(f"CUDA: {'Available' if torch.cuda.is_available() else 'Not available'}")
+    
+    return 0
+
+
+def info_command(args):
+    """Handle the info command - show quick start guide."""
+    if RICH_AVAILABLE:
+        console.print()
+        
+        # Quick start panel
+        quick_start = Text()
+        quick_start.append("1. Prepare your data\n", style="bold cyan")
+        quick_start.append("   Place your training text in a .txt or .json file\n\n")
+        quick_start.append("2. Start training\n", style="bold cyan")
+        quick_start.append("   langtune train --preset small --train-file data.txt\n\n", style="green")
+        quick_start.append("3. Evaluate your model\n", style="bold cyan")
+        quick_start.append("   langtune evaluate --config config.yaml --model-path model.pt\n\n", style="green")
+        quick_start.append("4. Generate text\n", style="bold cyan")
+        quick_start.append("   langtune generate --config config.yaml --model-path model.pt --prompt \"Hello\"\n", style="green")
+        
+        panel = Panel(
+            quick_start,
+            title="[bold]🚀 Quick Start Guide[/]",
+            border_style="cyan",
+            box=box.ROUNDED
+        )
+        console.print(panel)
+        
+        # Available presets
+        presets_table = Table(title="Available Model Presets", box=box.SIMPLE)
+        presets_table.add_column("Preset", style="cyan bold")
+        presets_table.add_column("Parameters", style="white")
+        presets_table.add_column("Use Case", style="dim")
+        
+        presets_table.add_row("tiny", "~1M", "Quick experiments, testing")
+        presets_table.add_row("small", "~10M", "Small datasets, fast training")
+        presets_table.add_row("base", "~50M", "General purpose")
+        presets_table.add_row("large", "~100M+", "Large datasets, best quality")
+        
+        console.print(presets_table)
+        console.print()
+        
+        # Links
+        console.print("[dim]📚 Documentation:[/] [blue underline]https://github.com/langtrain-ai/langtune[/]")
+        console.print("[dim]🐛 Report issues:[/] [blue underline]https://github.com/langtrain-ai/langtune/issues[/]")
+        console.print()
+    else:
+        print("""
+🚀 Quick Start Guide
+====================
+
+1. Prepare your data
+   Place your training text in a .txt or .json file
+
+2. Start training
+   langtune train --preset small --train-file data.txt
+
+3. Evaluate your model
+   langtune evaluate --config config.yaml --model-path model.pt
+
+4. Generate text
+   langtune generate --config config.yaml --model-path model.pt --prompt "Hello"
+
+Available Presets: tiny, small, base, large
+
+📚 Docs: https://github.com/langtrain-ai/langtune
+""")
+    
+    return 0
+
+
+def _print_banner():
+    """Print the CLI banner."""
+    if RICH_AVAILABLE:
+        banner = Text()
+        banner.append("\n╔═══════════════════════════════════════════════════════════╗\n", style="cyan bold")
+        banner.append("║", style="cyan bold")
+        banner.append("                        ", style="")
+        banner.append("LANGTUNE", style="bold magenta")
+        banner.append("                         ", style="")
+        banner.append("║\n", style="cyan bold")
+        banner.append("║", style="cyan bold")
+        banner.append("          Efficient LoRA Fine-Tuning for LLMs          ", style="dim")
+        banner.append("║\n", style="cyan bold")
+        banner.append("╚═══════════════════════════════════════════════════════════╝\n", style="cyan bold")
+        console.print(banner)
+
 
 def main():
     """Main CLI entry point."""
@@ -288,27 +442,30 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Train with a preset configuration
-  langtune train --preset small --train-file data/train.txt --output-dir outputs/
+  langtune info                                              # Show quick start guide
+  langtune version                                           # Show version info
+  langtune train --preset small --train-file data.txt        # Train with preset
+  langtune train --config config.yaml                        # Train with config
+  langtune evaluate --config config.yaml --model-path m.pt   # Evaluate model
+  langtune generate --config c.yaml --model-path m.pt        # Generate text
+  langtune concept --concept rlhf                            # Concept demo
 
-  # Train with a custom configuration
-  langtune train --config config.yaml --train-file data/train.txt
-
-  # Evaluate a trained model
-  langtune evaluate --config config.yaml --model-path outputs/best_model.pt
-
-  # Generate text with a trained model
-  langtune generate --config config.yaml --model-path outputs/best_model.pt --prompt "Hello world"
-
-  # Run a concept demonstration
-  langtune concept --concept rlhf
+Learn more: https://github.com/langtrain-ai/langtune
         """
     )
     
+    parser.add_argument('-v', '--version', action='store_true', help='Show version information')
+    
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
+    # Version command
+    subparsers.add_parser('version', help='Show version and system information')
+    
+    # Info command
+    subparsers.add_parser('info', help='Show quick start guide and documentation')
+    
     # Train command
-    train_parser = subparsers.add_parser('train', help='Train a model')
+    train_parser = subparsers.add_parser('train', help='Train a model with LoRA')
     train_parser.add_argument('--config', type=str, help='Path to configuration file')
     train_parser.add_argument('--preset', type=str, choices=['tiny', 'small', 'base', 'large'], 
                              help='Use a preset configuration')
@@ -343,12 +500,23 @@ Examples:
     
     args = parser.parse_args()
     
+    # Handle -v/--version flag
+    if args.version:
+        return version_command(args)
+    
     if not args.command:
+        _print_banner()
         parser.print_help()
+        if RICH_AVAILABLE:
+            console.print("\n[dim]💡 Tip: Run[/] [cyan]langtune info[/] [dim]for a quick start guide[/]\n")
         return 1
     
     # Route to appropriate command handler
-    if args.command == 'train':
+    if args.command == 'version':
+        return version_command(args)
+    elif args.command == 'info':
+        return info_command(args)
+    elif args.command == 'train':
         return train_command(args)
     elif args.command == 'evaluate':
         return evaluate_command(args)

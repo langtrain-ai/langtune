@@ -4,34 +4,99 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langtune"
-version = "0.1.1"
-description = "A package for finetuning text models."
+version = "0.1.2"
+description = "Efficient LoRA Fine-Tuning for Large Language Models - Train smarter, not harder."
 authors = [
     { name = "Pritesh Raj", email = "priteshraj41@gmail.com" }
+]
+maintainers = [
+    { name = "Langtrain AI", email = "contact@langtrain.ai" }
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
+keywords = [
+    "llm",
+    "lora",
+    "fine-tuning",
+    "machine-learning",
+    "deep-learning",
+    "transformers",
+    "nlp",
+    "language-model",
+    "pytorch",
+    "rlhf",
+    "dpo",
+    "ppo"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed"
+]
 dependencies = [
     "torch>=1.10",
     "numpy",
     "tqdm",
     "pyyaml",
     "scipy",
-    "wandb"
+    "wandb",
+    "rich>=13.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "isort"
+]
+all = [
+    "transformers",
+    "datasets",
+    "accelerate",
+    "bitsandbytes"
 ]
 
 [project.urls]
 Homepage = "https://github.com/langtrain-ai/langtune"
 Documentation = "https://github.com/langtrain-ai/langtune/tree/main/docs"
-Source = "https://github.com/langtrain-ai/langtune"
-Tracker = "https://github.com/langtrain-ai/langtune/issues"
+Repository = "https://github.com/langtrain-ai/langtune"
+Changelog = "https://github.com/langtrain-ai/langtune/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/langtrain-ai/langtune/issues"
 
 [project.scripts]
 langtune = "langtune.cli:main"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+langtune = ["py.typed"]
+
 [bumpver]
-current_version = "0.1.0"
+current_version = "0.1.2"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version: {old_version} → {new_version}"
 tag_message = "v{new_version}"
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
