@@ -14,6 +14,36 @@ _BANNER_SHOWN = False
 _SHOW_BANNER = os.environ.get("LANGTUNE_NO_BANNER", "0") != "1"
 
 
+def _check_tpu_available() -> bool:
+    """Check if Google TPU is available via torch_xla."""
+    try:
+        import torch_xla
+        import torch_xla.core.xla_model as xm
+        # Try to get a TPU device
+        device = xm.xla_device()
+        return "TPU" in str(device) or "xla" in str(device).lower()
+    except (ImportError, RuntimeError, Exception):
+        return False
+
+
+def _get_tpu_version() -> str:
+    """Get TPU version if available."""
+    try:
+        import torch_xla
+        # Try to detect TPU version from environment or device info
+        import os
+        tpu_name = os.environ.get("TPU_NAME", "")
+        if "v4" in tpu_name.lower():
+            return "4"
+        elif "v3" in tpu_name.lower():
+            return "3"
+        elif "v2" in tpu_name.lower():
+            return "2"
+        return "4"  # Default to v4 for newer TPUs
+    except:
+        return "?"
+
+
 def _show_welcome_banner():
     """Display a beautiful welcome banner on first import."""
     global _BANNER_SHOWN
@@ -32,7 +62,8 @@ def _show_welcome_banner():
         
         console = Console()
         
-        # Check GPU availability with detailed NVIDIA info
+        # Check GPU/TPU availability with detailed info
+        # Check for NVIDIA CUDA
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_count = torch.cuda.device_count()
@@ -43,18 +74,28 @@ def _show_welcome_banner():
                 cuda_version = torch.version.cuda
                 
                 if gpu_count > 1:
-                    gpu_info = f"✓ GPU: {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each, CUDA {cuda_version})"
+                    gpu_info = f"✓ NVIDIA: {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each, CUDA {cuda_version})"
                 else:
-                    gpu_info = f"✓ GPU: {gpu_name} ({gpu_memory:.0f}GB, CUDA {cuda_version})"
+                    gpu_info = f"✓ NVIDIA: {gpu_name} ({gpu_memory:.0f}GB, CUDA {cuda_version})"
             except:
-                gpu_info = f"✓ GPU: {gpu_name}"
+                gpu_info = f"✓ NVIDIA: {gpu_name}"
             
             gpu_style = "green"
+        # Check for Google TPU (via torch_xla)
+        elif _check_tpu_available():
+            try:
+                import torch_xla.core.xla_model as xm
+                tpu_count = xm.xrt_world_size()
+                gpu_info = f"✓ TPU: Google Cloud TPU v{_get_tpu_version()} ({tpu_count} cores)"
+            except:
+                gpu_info = "✓ TPU: Google Cloud TPU"
+            gpu_style = "green"
+        # Check for Apple MPS
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            gpu_info = "✓ GPU: Apple Silicon (MPS)"
+            gpu_info = "✓ Apple: Metal Performance Shaders (MPS)"
             gpu_style = "green"
         else:
-            gpu_info = "○ GPU: Not available (CPU mode)"
+            gpu_info = "○ Accelerator: Not available (CPU mode)"
             gpu_style = "yellow"
         
         # Create banner content

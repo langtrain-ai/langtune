@@ -370,10 +370,47 @@ def concept_command(args):
     return 0
 
 
+def _check_tpu() -> bool:
+    """Check if Google TPU is available via torch_xla."""
+    try:
+        import torch_xla
+        import torch_xla.core.xla_model as xm
+        device = xm.xla_device()
+        return "TPU" in str(device) or "xla" in str(device).lower()
+    except:
+        return False
+
+
+def _get_tpu_info() -> str:
+    """Get TPU information if available."""
+    try:
+        import os
+        import torch_xla.core.xla_model as xm
+        tpu_name = os.environ.get("TPU_NAME", "")
+        tpu_cores = xm.xrt_world_size()
+        
+        # Detect version
+        if "v4" in tpu_name.lower():
+            version = "v4"
+        elif "v3" in tpu_name.lower():
+            version = "v3"
+        elif "v2" in tpu_name.lower():
+            version = "v2"
+        else:
+            version = ""
+        
+        return f"{version} ({tpu_cores} cores)"
+    except:
+        return "(available)"
+
+
 def version_command(args):
     """Handle the version command."""
     if RICH_AVAILABLE:
-        # Check GPU availability with detailed NVIDIA info
+        # Check accelerator availability with detailed info
+        accelerator_type = "None"
+        
+        # Check for NVIDIA CUDA
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_count = torch.cuda.device_count()
@@ -383,20 +420,26 @@ def version_command(args):
                 cuda_version = torch.version.cuda
                 
                 if gpu_count > 1:
-                    gpu_info = f"[green]✓ {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each)[/]"
+                    gpu_info = f"[green]✓ NVIDIA {gpu_name} × {gpu_count} ({gpu_memory:.0f}GB each)[/]"
                 else:
-                    gpu_info = f"[green]✓ {gpu_name} ({gpu_memory:.0f}GB)[/]"
+                    gpu_info = f"[green]✓ NVIDIA {gpu_name} ({gpu_memory:.0f}GB)[/]"
                 
-                cuda_info = f"{cuda_version}"
+                accelerator_type = f"CUDA {cuda_version}"
             except:
-                gpu_info = f"[green]✓ {gpu_name}[/]"
-                cuda_info = "Available"
+                gpu_info = f"[green]✓ NVIDIA {gpu_name}[/]"
+                accelerator_type = "CUDA"
+        # Check for Google TPU
+        elif _check_tpu():
+            tpu_info = _get_tpu_info()
+            gpu_info = f"[green]✓ Google TPU {tpu_info}[/]"
+            accelerator_type = "TPU (torch_xla)"
+        # Check for Apple MPS
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            gpu_info = "[green]✓ Apple Silicon (MPS)[/]"
-            cuda_info = "N/A (Metal)"
+            gpu_info = "[green]✓ Apple Metal Performance Shaders (MPS)[/]"
+            accelerator_type = "Metal"
         else:
             gpu_info = "[yellow]○ Not available (CPU mode)[/]"
-            cuda_info = "No"
+            accelerator_type = "CPU"
         
         table = Table(title="Langtune System Info", box=box.ROUNDED, title_style="bold magenta")
         table.add_column("Component", style="cyan", no_wrap=True)
@@ -405,8 +448,8 @@ def version_command(args):
         table.add_row("Langtune Version", f"v{__version__}")
         table.add_row("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
         table.add_row("PyTorch Version", torch.__version__)
-        table.add_row("GPU Status", gpu_info)
-        table.add_row("CUDA Version", cuda_info)
+        table.add_row("Accelerator", gpu_info)
+        table.add_row("Backend", accelerator_type)
         
         console.print()
         console.print(table)
@@ -416,6 +459,7 @@ def version_command(args):
         print(f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
         print(f"PyTorch {torch.__version__}")
         print(f"CUDA: {'Available' if torch.cuda.is_available() else 'Not available'}")
+        print(f"TPU: {'Available' if _check_tpu() else 'Not available'}")
     
     return 0
 
