@@ -3,8 +3,8 @@
 <hr/>
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/langtrain-ai/langtrain/main/static/langtune-use-dark.png">
-    <img alt="Langtune Logo" src="https://raw.githubusercontent.com/langtrain-ai/langtrain/main/static/langtune-white.png" width="full" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-use-dark.png">
+    <img alt="Langtune Logo" src="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-white.png" width="full" />
   </picture>
 </p>
 
