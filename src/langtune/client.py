@@ -16,7 +16,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Default API base URL
-DEFAULT_API_BASE = "https://api.langtrain.ai/v1"
+DEFAULT_API_BASE = "https://api.langtrain.xyz/v1"
 
 
 class JobStatus(Enum):
@@ -83,7 +83,7 @@ class LangtuneClient:
         
         Args:
             api_key: API key (defaults to LANGTUNE_API_KEY env var)
-            base_url: API base URL (defaults to https://api.langtrain.ai/v1)
+            base_url: API base URL (defaults to https://api.langtrain.xyz/v1)
             timeout: Request timeout in seconds
         """
         self.api_key = api_key or os.environ.get("LANGTUNE_API_KEY")
