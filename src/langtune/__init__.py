@@ -195,8 +195,14 @@ from .trainer import (
 
 # Fine-tuning (best-practice API)
 from .finetune import (
-    finetune, finetune_from_config, FineTuneConfig, train, fine_tune
+    finetune as local_finetune, finetune_from_config, FineTuneConfig
 )
+
+# Client SDK
+from .client import LangtuneClient, FineTuneJob, JobStatus, Model, APIError, get_client
+
+# High-level API (server + local)
+from .api import finetune, generate, chat, list_models, list_jobs, get_job, cancel_job
 
 # Callbacks
 from .callbacks import (
