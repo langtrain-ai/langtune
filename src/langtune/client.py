@@ -54,6 +54,57 @@ class Model:
     supports_finetuning: bool
 
 
+@dataclass
+class Agent:
+    """Represents an AI agent."""
+    id: str
+    name: str
+    workspace_id: str
+    description: Optional[str] = None
+    model_id: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    is_active: bool = True
+    created_at: Optional[str] = None
+
+
+@dataclass
+class AgentRun:
+    """Represents an agent execution run."""
+    id: str
+    status: str
+    agent_id: str
+    input: Dict[str, Any]
+    output: Optional[Dict[str, Any]] = None
+    token_usage: Optional[Dict[str, int]] = None
+    latency_ms: Optional[int] = None
+    created_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    error: Optional[str] = None
+
+
+@dataclass
+class UsageRecord:
+    """Represents workspace usage for a period."""
+    tokens_used: int
+    tokens_limit: int
+    finetune_jobs_used: int
+    finetune_jobs_limit: int
+    agent_runs_used: int
+    agent_runs_limit: int
+    period_start: str
+    period_end: Optional[str] = None
+
+
+@dataclass
+class Plan:
+    """Represents a billing plan."""
+    id: Optional[str]
+    name: str
+    code: str
+    billing_period: str
+    limits: Dict[str, int]
+
+
 class LangtuneClient:
     """
     Client for Langtrain API.
@@ -373,6 +424,223 @@ class LangtuneClient:
             context_length=response.get("context_length", 4096),
             supports_finetuning=response.get("supports_finetuning", False)
         )
+
+    # ==================== Agents ====================
+    
+    def create_agent(
+        self,
+        workspace_id: str,
+        name: str,
+        model_id: Optional[str] = None,
+        description: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Agent:
+        """
+        Create a new agent.
+        
+        Args:
+            workspace_id: Workspace ID
+            name: Agent name
+            model_id: Optional model ID to use
+            description: Agent description
+            config: Agent configuration (system_prompt, temperature, tools, etc.)
+            
+        Returns:
+            Agent object
+        """
+        data = {
+            "name": name,
+            "description": description or "",
+            "model_id": model_id,
+            "config": config or {"system_prompt": "You are a helpful assistant.", "temperature": 0.7}
+        }
+        
+        response = self._request("POST", f"/workspaces/{workspace_id}/agents", data)
+        return self._parse_agent(response)
+    
+    def list_agents(self, workspace_id: str) -> List[Agent]:
+        """List agents in a workspace."""
+        response = self._request("GET", f"/workspaces/{workspace_id}/agents")
+        return [self._parse_agent(a) for a in response.get("data", [])]
+    
+    def get_agent(self, agent_id: str) -> Agent:
+        """Get agent details."""
+        response = self._request("GET", f"/agents/{agent_id}")
+        return self._parse_agent(response)
+    
+    def update_agent(
+        self,
+        agent_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        model_id: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Agent:
+        """Update an agent."""
+        data = {}
+        if name is not None:
+            data["name"] = name
+        if description is not None:
+            data["description"] = description
+        if model_id is not None:
+            data["model_id"] = model_id
+        if config is not None:
+            data["config"] = config
+        
+        response = self._request("PATCH", f"/agents/{agent_id}", data)
+        return self._parse_agent(response)
+    
+    def delete_agent(self, agent_id: str) -> bool:
+        """Delete an agent (soft delete)."""
+        response = self._request("DELETE", f"/agents/{agent_id}")
+        return response.get("success", False)
+    
+    def run_agent(
+        self,
+        agent_id: str,
+        messages: List[Dict[str, str]],
+        params: Optional[Dict[str, Any]] = None
+    ) -> AgentRun:
+        """
+        Execute an agent run.
+        
+        Args:
+            agent_id: Agent ID
+            messages: List of {"role": "user/assistant", "content": "..."}
+            params: Optional additional parameters
+            
+        Returns:
+            AgentRun with output
+        """
+        data = {
+            "input": {
+                "messages": messages,
+                **(params or {})
+            }
+        }
+        
+        response = self._request("POST", f"/agents/{agent_id}/runs", data)
+        return self._parse_agent_run(response)
+    
+    def list_agent_runs(
+        self,
+        agent_id: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[AgentRun]:
+        """List runs for an agent."""
+        response = self._request("GET", f"/agents/{agent_id}/runs?limit={limit}&offset={offset}")
+        return [self._parse_agent_run(r) for r in response.get("data", [])]
+    
+    def _parse_agent(self, data: Dict) -> Agent:
+        """Parse agent response."""
+        return Agent(
+            id=data["id"],
+            name=data.get("name", ""),
+            workspace_id=data.get("workspace_id", ""),
+            description=data.get("description"),
+            model_id=data.get("model_id"),
+            config=data.get("config"),
+            is_active=data.get("is_active", True),
+            created_at=data.get("created_at")
+        )
+    
+    def _parse_agent_run(self, data: Dict) -> AgentRun:
+        """Parse agent run response."""
+        return AgentRun(
+            id=data["id"],
+            status=data.get("status", "unknown"),
+            agent_id=data.get("agent_id", ""),
+            input=data.get("input", {}),
+            output=data.get("output"),
+            token_usage=data.get("token_usage"),
+            latency_ms=data.get("latency_ms"),
+            created_at=data.get("created_at"),
+            finished_at=data.get("finished_at"),
+            error=data.get("error")
+        )
+    
+    # ==================== Billing & Usage ====================
+    
+    def get_usage(self, workspace_id: str) -> UsageRecord:
+        """
+        Get current usage for a workspace.
+        
+        Args:
+            workspace_id: Workspace ID
+            
+        Returns:
+            UsageRecord with current usage and limits
+        """
+        response = self._request("GET", f"/billing/usage?workspace_id={workspace_id}")
+        return UsageRecord(
+            tokens_used=response.get("tokens", {}).get("used", 0),
+            tokens_limit=response.get("tokens", {}).get("limit", 0),
+            finetune_jobs_used=response.get("finetune_jobs", {}).get("used", 0),
+            finetune_jobs_limit=response.get("finetune_jobs", {}).get("limit", 0),
+            agent_runs_used=response.get("agent_runs", {}).get("used", 0),
+            agent_runs_limit=response.get("agent_runs", {}).get("limit", 0),
+            period_start=response.get("period", {}).get("start", ""),
+            period_end=response.get("period", {}).get("end")
+        )
+    
+    def get_plan(self, workspace_id: str) -> Plan:
+        """
+        Get current plan for a workspace.
+        
+        Args:
+            workspace_id: Workspace ID
+            
+        Returns:
+            Plan with limits
+        """
+        response = self._request("GET", f"/billing/plan?workspace_id={workspace_id}")
+        plan_data = response.get("plan", {})
+        return Plan(
+            id=plan_data.get("id"),
+            name=plan_data.get("name", "Free"),
+            code=plan_data.get("code", "free"),
+            billing_period=plan_data.get("billing_period", "lifetime"),
+            limits=response.get("limits", {})
+        )
+    
+    # ==================== Workspace Finetune Jobs ====================
+    
+    def create_workspace_finetune_job(
+        self,
+        workspace_id: str,
+        base_model: str,
+        dataset_id: str,
+        name: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None
+    ) -> FineTuneJob:
+        """
+        Create a finetune job in a workspace.
+        
+        Args:
+            workspace_id: Workspace ID
+            base_model: Base model name (e.g., "Llama-3-8B")
+            dataset_id: Dataset ID
+            name: Optional name for the finetuned model
+            config: Training configuration (epochs, lr, batch_size, etc.)
+            
+        Returns:
+            FineTuneJob object
+        """
+        data = {
+            "base_model": base_model,
+            "dataset_id": dataset_id,
+            "name": name,
+            "config": config or {}
+        }
+        
+        response = self._request("POST", f"/workspaces/{workspace_id}/finetune-jobs", data)
+        return self._parse_job(response)
+    
+    def list_workspace_finetune_jobs(self, workspace_id: str) -> List[FineTuneJob]:
+        """List finetune jobs in a workspace."""
+        response = self._request("GET", f"/workspaces/{workspace_id}/finetune-jobs")
+        return [self._parse_job(j) for j in response.get("data", [])]
 
 
 class APIError(Exception):
