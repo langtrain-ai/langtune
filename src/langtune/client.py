@@ -153,6 +153,51 @@ class LangtuneClient:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
     
+    # ==================== API Key Validation ====================
+    
+    def validate(self) -> Dict[str, Any]:
+        """
+        Validate the API key and return plan/feature info.
+        
+        Returns:
+            dict with:
+                - valid: bool
+                - plan: str (free, pro, enterprise)
+                - features: list of feature names
+                - limits: dict of limits
+                - workspace_id: str
+                
+        Raises:
+            APIError: If validation fails
+        """
+        if not self.api_key:
+            return {"valid": False, "error": "No API key configured"}
+        
+        try:
+            response = self._request("POST", "/auth/api-keys/validate", {"api_key": self.api_key})
+            return response
+        except Exception as e:
+            return {"valid": False, "error": str(e)}
+    
+    def is_valid(self) -> bool:
+        """Check if API key is valid."""
+        result = self.validate()
+        return result.get("valid", False)
+    
+    def get_features(self) -> List[str]:
+        """Get list of available features for current plan."""
+        result = self.validate()
+        return result.get("features", [])
+    
+    def has_feature(self, feature: str) -> bool:
+        """Check if a specific feature is available."""
+        return feature in self.get_features()
+    
+    def get_limits(self) -> Dict[str, int]:
+        """Get current plan limits."""
+        result = self.validate()
+        return result.get("limits", {})
+    
     def _request(
         self,
         method: str,
@@ -208,9 +253,13 @@ class LangtuneClient:
         self,
         training_file: str,
         model: str = "llama-7b",
+        training_method: str = "qlora",
         validation_file: Optional[str] = None,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        suffix: Optional[str] = None
+        suffix: Optional[str] = None,
+        sft_config: Optional[Dict[str, Any]] = None,
+        dpo_config: Optional[Dict[str, Any]] = None,
+        rlhf_config: Optional[Dict[str, Any]] = None,
     ) -> FineTuneJob:
         """
         Create a fine-tuning job.
@@ -218,9 +267,18 @@ class LangtuneClient:
         Args:
             training_file: Path to training data (JSONL format)
             model: Base model to fine-tune
+            training_method: Training method - one of:
+                - "sft" (Supervised Fine-Tuning)
+                - "dpo" (Direct Preference Optimization)
+                - "rlhf" (Reinforcement Learning from Human Feedback)
+                - "lora" (LoRA adapters)
+                - "qlora" (Quantized LoRA, default)
             validation_file: Optional validation data
             hyperparameters: Training hyperparameters
             suffix: Suffix for the fine-tuned model name
+            sft_config: SFT-specific config (packing, dataset_text_field)
+            dpo_config: DPO-specific config (beta, loss_type)
+            rlhf_config: RLHF-specific config (reward_model, ppo_epochs)
             
         Returns:
             FineTuneJob object
@@ -230,7 +288,8 @@ class LangtuneClient:
         
         data = {
             "training_file": training_file_id,
-            "model": model
+            "model": model,
+            "training_method": training_method
         }
         
         if validation_file:
@@ -242,6 +301,14 @@ class LangtuneClient:
         
         if suffix:
             data["suffix"] = suffix
+        
+        # Method-specific configs
+        if sft_config and training_method == "sft":
+            data["sft_config"] = sft_config
+        if dpo_config and training_method == "dpo":
+            data["dpo_config"] = dpo_config
+        if rlhf_config and training_method == "rlhf":
+            data["rlhf_config"] = rlhf_config
         
         response = self._request("POST", "/fine-tuning/jobs", data)
         return self._parse_job(response)
