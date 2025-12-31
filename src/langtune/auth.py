@@ -177,7 +177,7 @@ def verify_api_key(api_key: str, force_refresh: bool = False) -> Dict[str, Any]:
         else:
             raise AuthenticationError(
                 "Invalid API key format. Keys should start with 'lt_' and be at least 32 characters.\n"
-                "Get your API key at: https://langtrain.xyz/dashboard"
+                "Get your API key at: https://app.langtrain.xyz"
             )
     
     # Make API call to verify key
@@ -196,12 +196,12 @@ def verify_api_key(api_key: str, force_refresh: bool = False) -> Dict[str, Any]:
             return user_data
         elif response.status_code == 401:
             raise AuthenticationError(
-                "Invalid API key. Please check your key at: https://langtrain.xyz/dashboard"
+                "Invalid API key. Please check your key at: https://app.langtrain.xyz"
             )
         elif response.status_code == 403:
             raise UsageLimitError(
                 "API key is valid but access is denied. Your subscription may have expired.\n"
-                "Manage your subscription at: https://langtrain.xyz/billing"
+                "Manage your subscription at: https://billing.langtrain.xyz"
             )
         else:
             raise AuthenticationError(
@@ -231,13 +231,13 @@ def check_usage(api_key: str) -> Dict[str, Any]:
     if tokens_used >= tokens_limit:
         raise UsageLimitError(
             f"Token limit exceeded ({tokens_used:,}/{tokens_limit:,}).\n"
-            "Upgrade your plan at: https://langtrain.xyz/billing"
+            "Upgrade your plan at: https://billing.langtrain.xyz"
         )
     
     if requests_used >= requests_limit:
         raise UsageLimitError(
             f"Request limit exceeded ({requests_used:,}/{requests_limit:,}).\n"
-            "Upgrade your plan at: https://langtrain.xyz/billing"
+            "Upgrade your plan at: https://billing.langtrain.xyz"
         )
     
     return {
@@ -281,7 +281,7 @@ def _print_auth_required():
         text.append("\n🔐 ", style="")
         text.append("API Key Required\n\n", style="bold red")
         text.append("Langtune requires an API key to run. Get your free key at:\n", style="")
-        text.append("https://langtrain.xyz/dashboard\n\n", style="blue underline")
+        text.append("https://app.langtrain.xyz\n\n", style="blue underline")
         text.append("Once you have your key, authenticate using:\n\n", style="")
         text.append("  langtune auth login\n\n", style="cyan")
         text.append("Or set the environment variable:\n\n", style="")
@@ -294,7 +294,7 @@ def _print_auth_required():
 🔐 API Key Required
 
 Langtune requires an API key to run. Get your free key at:
-https://langtrain.xyz/dashboard
+https://app.langtrain.xyz
 
 Once you have your key, authenticate using:
 
@@ -363,12 +363,12 @@ def print_usage_info():
             console.print(f"[dim]Plan:[/] [bold]{usage['plan'].title()}[/]")
             console.print(table)
             console.print()
-            console.print("[dim]Manage your plan at:[/] [blue underline]https://langtrain.xyz/billing[/]\n")
+            console.print("[dim]Manage your plan at:[/] [blue underline]https://billing.langtrain.xyz[/]\n")
         else:
             print(f"\nPlan: {usage['plan'].title()}")
             print(f"Tokens: {usage['tokens_used']:,} / {usage['tokens_limit']:,}")
             print(f"Requests: {usage['requests_used']:,} / {usage['requests_limit']:,}")
-            print(f"\nManage your plan at: https://langtrain.xyz/billing\n")
+            print(f"\nManage your plan at: https://billing.langtrain.xyz\n")
     
     except (AuthenticationError, UsageLimitError) as e:
         if RICH_AVAILABLE:
@@ -381,11 +381,11 @@ def interactive_login():
     """Interactive login flow."""
     if RICH_AVAILABLE:
         console.print("\n[bold cyan]🔐 Langtune Authentication[/]\n")
-        console.print("Get your API key at: [blue underline]https://langtrain.xyz/dashboard[/]\n")
+        console.print("Get your API key at: [blue underline]https://app.langtrain.xyz[/]\n")
         api_key = console.input("[bold]Enter your API key:[/] ")
     else:
         print("\n🔐 Langtune Authentication\n")
-        print("Get your API key at: https://langtrain.xyz/dashboard\n")
+        print("Get your API key at: https://app.langtrain.xyz\n")
         api_key = input("Enter your API key: ")
     
     api_key = api_key.strip()

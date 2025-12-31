@@ -51,11 +51,11 @@ def _check_auth():
         if RICH_AVAILABLE:
             console.print("\n[bold red]🔐 Authentication Required[/]\n")
             console.print("Langtune requires an API key to run. Get your free key at:")
-            console.print("[blue underline]https://langtrain.xyz/dashboard[/]\n")
+            console.print("[blue underline]https://app.langtrain.xyz[/]\n")
             console.print("Then authenticate with: [cyan]langtune auth login[/]\n")
         else:
             print("\n🔐 Authentication Required\n")
-            print("Get your API key at: https://langtrain.xyz/dashboard")
+            print("Get your API key at: https://app.langtrain.xyz")
             print("Then run: langtune auth login\n")
         return False
     
@@ -652,7 +652,7 @@ Learn more: https://github.com/langtrain-ai/langtune
                 console.print("  [cyan]langtune auth login[/]   - Login with your API key")
                 console.print("  [cyan]langtune auth logout[/]  - Remove stored API key")
                 console.print("  [cyan]langtune auth status[/]  - Show auth status and usage\n")
-                console.print("[dim]Get your API key at:[/] [blue underline]https://langtrain.xyz/dashboard[/]\n")
+                console.print("[dim]Get your API key at:[/] [blue underline]https://app.langtrain.xyz[/]\n")
             else:
                 print("\nAuthentication Commands:\n")
                 print("  langtune auth login   - Login with your API key")
