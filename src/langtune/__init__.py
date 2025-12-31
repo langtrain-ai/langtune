@@ -260,6 +260,9 @@ from .auth import (
 # CLI
 from .cli import main
 
+# Facades (Quick Start API)
+from .facade import LoRATrainer, QLoRATrainer, ChatModel, deploy
+
 __all__ = [
     # Models
     "LoRALanguageModel", "LoRALinear", "MultiHeadAttention", "TransformerBlock",
@@ -302,6 +305,9 @@ __all__ = [
     
     # CLI
     "main",
+    
+    # Facades
+    "LoRATrainer", "QLoRATrainer", "ChatModel", "deploy",
     
     # Version
     "__version__"

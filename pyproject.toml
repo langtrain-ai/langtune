@@ -52,7 +52,8 @@ dependencies = [
     "pyyaml",
     "scipy",
     "wandb",
-    "rich>=13.0.0"
+    "rich>=13.0.0",
+    "langtrain-common @ file://../../langtrain-server/langtrain-common"
 ]
 
 [project.optional-dependencies]
