@@ -1,4 +1,4 @@
-# Langtune: Efficient LoRA Fine-Tuning for Text LLMs
+# Langtune: Efficient LoRA Fine-Tuning for Text LLMs (Latest)
 
 <div align="center">
 
