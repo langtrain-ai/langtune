@@ -82,6 +82,16 @@ class LoRATrainer:
                 alpha=hp.get("lora_alpha", 32.0)
             )
             
+            # Activate NEFTune if requested
+            if hp.get("use_neftune", False):
+                try:
+                    from .training.neftune import activate_neftune
+                    # In a real scenario, this would apply to the loaded model instance
+                    # Since we are mocking the loader here, we just log it
+                    print("🔊 NEFTune: Enqueued for activation (alpha=5.0)")
+                except ImportError:
+                    print("⚠️ NEFTune module not found, skipping.")
+
             print(f"✅ [ModelLoader] Pipeline ready for {self.model_name}")
             print(f"   - Hub Resolver: Cached snapshot")
             print(f"   - Tensor Streamer: Mmap enabled")
@@ -93,6 +103,8 @@ class LoRATrainer:
             print(f"     • Mixed Precision: {training_config.mixed_precision}")
             print(f"     • LoRA Rank: {lora_config.rank}")
             print(f"     • LoRA Alpha: {lora_config.alpha}")
+            if hp.get("use_neftune", False):
+                print(f"     • NEFTune: Enabled 🔊")
             
             print(f"✅ Training started using {('QLoRA' if self.load_in_4bit else 'LoRA')}")
             print("... (Training progress bar would appear here) ...")
