@@ -160,10 +160,8 @@ if sys.stdout.isatty():
 
 
 # Core models
-from .models import (
     LoRALanguageModel, LoRALinear, MultiHeadAttention, TransformerBlock,
-    FastLoRALanguageModel, FastMultiHeadAttention, FastTransformerBlock,
-    RLHF, CoT, CCoT, GRPO, RLVR, DPO, PPO, LIME, SHAP
+    FastLoRALanguageModel, FastMultiHeadAttention, FastTransformerBlock
 )
 
 # Optimizations
@@ -267,7 +265,7 @@ __all__ = [
     # Models
     "LoRALanguageModel", "LoRALinear", "MultiHeadAttention", "TransformerBlock",
     "FastLoRALanguageModel", "FastMultiHeadAttention", "FastTransformerBlock",
-    "RLHF", "CoT", "CCoT", "GRPO", "RLVR", "DPO", "PPO", "LIME", "SHAP",
+    "FastLoRALanguageModel", "FastMultiHeadAttention", "FastTransformerBlock",
     
     # Optimizations
     "OptimizationConfig", "QuantizedLinear", "LoRALinear4bit",
