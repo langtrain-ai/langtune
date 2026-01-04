@@ -94,6 +94,12 @@ version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version: {old_version} → {new_version}"
 tag_message = "v{new_version}"
 
+[bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+    'version = "{version}"',
+]
+
 [tool.black]
 line-length = 100
 target-version = ["py38", "py39", "py310", "py311", "py312"]
