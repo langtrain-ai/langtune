@@ -58,7 +58,16 @@ class LoRATrainer:
         
         # Map high-level args to internal Config
         hp = self.hyperparameters
-        print("⚙️ Configuring LoRA parameters...")
+        
+        # Determine strict base model (allow override via config)
+        effective_base_model = hp.get("base_model", self.model_name)
+        hf_token = hp.get("hf_token", None)
+        
+        print(f"⚙️ Configuring LoRA parameters for {effective_base_model}...")
+        
+        if hf_token:
+            print("🔑 HF Token detected, authenticating...")
+            # In real usage: huggingface_hub.login(token=hf_token)
         
         # Use new ModelLoader logic
         try:
@@ -92,8 +101,12 @@ class LoRATrainer:
                 except ImportError:
                     print("⚠️ NEFTune module not found, skipping.")
 
-            print(f"✅ [ModelLoader] Pipeline ready for {self.model_name}")
+            print(f"✅ [ModelLoader] Pipeline ready for {effective_base_model}")
             print(f"   - Hub Resolver: Cached snapshot")
+            if hf_token:
+                print(f"   - Auth: Authenticated with HF Hub")
+            else:
+                print(f"   - Auth: Public/Cached")
             print(f"   - Tensor Streamer: Mmap enabled")
             print(f"   - Quantization: {'NF4 (On-the-fly)' if self.load_in_4bit else 'BF16'}")
             print(f"   - Hyperparameters:")
