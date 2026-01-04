@@ -160,6 +160,7 @@ if sys.stdout.isatty():
 
 
 # Core models
+from .models import (
     LoRALanguageModel, LoRALinear, MultiHeadAttention, TransformerBlock,
     FastLoRALanguageModel, FastMultiHeadAttention, FastTransformerBlock
 )
