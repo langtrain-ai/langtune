@@ -36,10 +36,20 @@ class ModelLoader:
         model_id: str,
         quantization: Optional[str] = None, # "nf4", "fp4"
         dtype: str = "bf16",
-        device: str = "cuda"
+        device: str = "cuda",
+        planner_config: Optional[Dict[str, Any]] = None,
+        inject_kernels: bool = True
     ) -> nn.Module:
         """
         Load a model with the optimized pipeline.
+        
+        Args:
+            model_id: HuggingFace model ID or local path
+            quantization: Quantization mode ("nf4", "fp4", None)
+            dtype: Compute dtype ("bf16", "fp16")
+            device: Target device
+            planner_config: Optional config from TrainingPlanner for selective loading
+            inject_kernels: Whether to inject optimized CUDA kernels
         """
         # 1. Resolve
         model_path = self.resolver.resolve(model_id)
@@ -61,18 +71,27 @@ class ModelLoader:
         # Using `to_empty` moves to device but allocating memory
         model = model.to_empty(device=device)
         
-        # 3. Stream Weights
-        logger.info("Streaming weights...")
-        streamer = TensorStreamer(model_path)
+        # 3. Stream Weights with Priority
+        logger.info("Streaming weights with priority ordering...")
+        from .safetensors import PriorityTensorStreamer
+        streamer = PriorityTensorStreamer(model_path)
         
-        # 4. Load & Quantize
+        # 4. Load & Quantize (with planner-aware skipping)
         compute_dtype = torch.bfloat16 if dtype == "bf16" else torch.float16
         loader = WeightLoader(streamer, quantization_mode=quantization, compute_dtype=compute_dtype, device=device)
         
-        loader.load_into_module(model)
+        # Determine layers to skip based on planner config
+        skip_patterns = []
+        if planner_config:
+            skip_patterns = planner_config.get("frozen_layer_patterns", [])
+            logger.info(f"Planner config: Skipping patterns {skip_patterns}")
         
-        # 5. Kernel Injection (Placeholder)
-        # self._inject_kernels(model)
+        loader.load_into_module(model, skip_patterns=skip_patterns)
+        
+        # 5. Kernel Injection
+        if inject_kernels:
+            logger.info("Injecting optimized kernels...")
+            self._inject_kernels(model)
         
         return model
 
@@ -80,5 +99,5 @@ class ModelLoader:
         """
         Replace layers with Langtrain Custom Kernels.
         """
-        # Implementation to be added in next step
-        pass
+        from .kernels import inject_kernels
+        return inject_kernels(model, use_flash_attention=True, use_fused_linear=True)

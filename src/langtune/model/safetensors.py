@@ -102,3 +102,56 @@ class TensorStreamer:
                 for key in f.keys():
                     yield key, f.get_tensor(key)
 
+# Layer priority order for optimal VRAM management
+LAYER_PRIORITY = [
+    'self_attn',      # Attention layers first (critical path)
+    'q_proj', 'k_proj', 'v_proj', 'o_proj',  # Attention projections
+    'mlp',            # MLP layers
+    'gate_proj', 'up_proj', 'down_proj',     # MLP projections  
+    'input_layernorm', 'post_attention_layernorm',  # Norms last (small)
+    'embed_tokens', 'lm_head'  # Embeddings
+]
+
+class PriorityTensorStreamer(TensorStreamer):
+    """
+    Enhanced streamer that loads tensors in priority order to minimize peak VRAM.
+    """
+    
+    def stream_by_priority(self, device: str = "cpu") -> Iterator[Tuple[str, torch.Tensor]]:
+        """
+        Yields tensors in priority order: attention → MLP → norms.
+        This minimizes VRAM spikes during loading.
+        """
+        yielded = set()
+        
+        # First pass: yield in priority order
+        for priority_key in LAYER_PRIORITY:
+            for name in self.index:
+                if name in yielded:
+                    continue
+                if priority_key in name:
+                    yield name, self.get_tensor(name, device)
+                    yielded.add(name)
+        
+        # Second pass: yield any remaining tensors
+        for name in self.index:
+            if name not in yielded:
+                yield name, self.get_tensor(name, device)
+                yielded.add(name)
+
+    def get_load_order(self) -> List[str]:
+        """
+        Returns tensor names in priority order (for planning/debugging).
+        """
+        ordered = []
+        remaining = set(self.index.keys())
+        
+        for priority_key in LAYER_PRIORITY:
+            for name in list(remaining):
+                if priority_key in name:
+                    ordered.append(name)
+                    remaining.remove(name)
+        
+        # Add remaining
+        ordered.extend(sorted(remaining))
+        return ordered
