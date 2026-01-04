@@ -68,7 +68,16 @@ class WeightLoader:
                 tensor = self.streamer.get_tensor(full_name, device="cpu")
                 
                 # Apply Quantize-on-Read
-                if self.quantization_mode and "lora" not in full_name and "norm" not in full_name:
+                # Skip quantization for: LoRA adapters, norms, and BIAS terms
+                should_quantize = (
+                    self.quantization_mode 
+                    and "lora" not in full_name 
+                    and "norm" not in full_name
+                    and "bias" not in name  # Bias terms stay in full precision!
+                    and tensor.dim() > 1    # Only quantize 2D+ tensors (weights)
+                )
+                
+                if should_quantize:
                      self._quantize_and_assign(module, name, tensor)
                 else:
                     # Standard loading
