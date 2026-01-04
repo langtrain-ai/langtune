@@ -123,7 +123,21 @@ class MultiHeadAttention(nn.Module):
         
         # Compute Q, K, V
         if self.use_lora:
-            qkv = self.lora_qkv(x) + self.qkv(x)
+            from langtune.acceleration import Accelerator
+            accelerator = Accelerator()
+            
+            if accelerator.is_available() and x.is_cuda:
+                qkv = accelerator.fused_lora(
+                    x, 
+                    self.qkv.weight, 
+                    self.lora_qkv.lora_A, 
+                    self.lora_qkv.lora_B, 
+                    self.lora_qkv.scaling
+                )
+                if self.qkv.bias is not None:
+                    qkv += self.qkv.bias
+            else:
+                qkv = self.lora_qkv(x) + self.qkv(x)
         else:
             qkv = self.qkv(x)
             
@@ -146,7 +160,18 @@ class MultiHeadAttention(nn.Module):
         
         # Output projection
         if self.use_lora:
-            out = self.lora_proj(out) + self.proj(out)
+            if accelerator.is_available() and x.is_cuda:
+                out = accelerator.fused_lora(
+                    out, 
+                    self.proj.weight, 
+                    self.lora_proj.lora_A, 
+                    self.lora_proj.lora_B, 
+                    self.lora_proj.scaling
+                )
+                if self.proj.bias is not None:
+                    out += self.proj.bias
+            else:
+                out = self.lora_proj(out) + self.proj(out)
         else:
             out = self.proj(out)
             

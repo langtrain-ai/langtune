@@ -1,0 +1,84 @@
+"""
+Model Loader.
+
+Orchestrates the loading pipeline:
+1. Hub Resolution
+2. Architecture Construction
+3. Streaming Weight Loading
+4. Kernel Injection
+"""
+
+import torch
+import torch.nn as nn
+from typing import Optional, Dict, Any, Union
+import logging
+
+from .hub import HubResolver, get_resolver
+from .safetensors import TensorStreamer
+from .weights import WeightLoader
+
+logger = logging.getLogger(__name__)
+
+class ModelLoader:
+    """
+    Main entry point for loading models with high performance.
+    """
+    
+    def __init__(
+        self, 
+        offline: bool = False,
+        cache_dir: Optional[str] = None
+    ):
+        self.resolver = get_resolver(offline=offline, cache_dir=cache_dir)
+        
+    def load(
+        self,
+        model_id: str,
+        quantization: Optional[str] = None, # "nf4", "fp4"
+        dtype: str = "bf16",
+        device: str = "cuda"
+    ) -> nn.Module:
+        """
+        Load a model with the optimized pipeline.
+        """
+        # 1. Resolve
+        model_path = self.resolver.resolve(model_id)
+        
+        # 2. Config & Architecture
+        # For now, we rely on HF config to build the skeleton
+        # In the future, we will use our "architectures" registry
+        from transformers import AutoConfig, AutoModelForCausalLM
+        
+        config = AutoConfig.from_pretrained(model_path)
+        
+        logger.info(f"Building model skeleton for {model_id}...")
+        # Creation on 'meta' device avoids memory allocation!
+        with torch.device("meta"):
+             model = AutoModelForCausalLM.from_config(config)
+             
+        # Move empty shell to CPU/device?
+        # Meta tensors can't be used directly for loading usually without `to_empty`
+        # Using `to_empty` moves to device but allocating memory
+        model = model.to_empty(device=device)
+        
+        # 3. Stream Weights
+        logger.info("Streaming weights...")
+        streamer = TensorStreamer(model_path)
+        
+        # 4. Load & Quantize
+        compute_dtype = torch.bfloat16 if dtype == "bf16" else torch.float16
+        loader = WeightLoader(streamer, quantization_mode=quantization, compute_dtype=compute_dtype, device=device)
+        
+        loader.load_into_module(model)
+        
+        # 5. Kernel Injection (Placeholder)
+        # self._inject_kernels(model)
+        
+        return model
+
+    def _inject_kernels(self, model: nn.Module):
+        """
+        Replace layers with Langtrain Custom Kernels.
+        """
+        # Implementation to be added in next step
+        pass
