@@ -53,7 +53,7 @@ dependencies = [
     "scipy",
     "wandb",
     "rich>=13.0.0",
-    "langtrain-common>=0.1.0"
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
