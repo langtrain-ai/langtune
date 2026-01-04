@@ -3,8 +3,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-use-dark.png">
-  <img alt="Langtune Logo" src="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-white.png" width="400" />
+  <source media="(prefers-color-scheme: dark)" srcset="static/langtune-use-dark.png">
+  <img alt="Langtune Logo" src="static/langtune-white.png" width="400" />
 </picture>
 
 ### Fine-tune your first LLM in under 5 minutes
