@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langtune"
-version = "0.1.21"
+version = "0.1.22"
 description = "Efficient LoRA Fine-Tuning for Large Language Models - Train smarter, not harder."
 authors = [
     { name = "Pritesh Raj", email = "priteshraj41@gmail.com" }
@@ -89,7 +89,7 @@ where = ["src"]
 langtune = ["py.typed"]
 
 [bumpver]
-current_version = "0.1.21"
+current_version = "0.1.22"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version: {old_version} → {new_version}"
 tag_message = "v{new_version}"
