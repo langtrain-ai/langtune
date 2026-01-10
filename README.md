@@ -32,6 +32,14 @@
 
 ## ⚡ Quick Start
 
+### 1-Click Install (Recommended)
+The fastest way to get started. Installs Langtune in an isolated environment.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/langtrain-ai/langtune/main/scripts/install.sh | bash
+```
+
+### Or using pip
 ```bash
 pip install langtune
 ```
