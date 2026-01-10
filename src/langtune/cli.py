@@ -348,8 +348,10 @@ def main():
     
     if args.version: return version_command(args)
     if not args.command:
-        parser.print_help()
-        return 1
+        # Use our custom rich help
+        from .rich_help import print_rich_help
+        print_rich_help(parser)
+        return 0
         
     if args.command == 'auth':
         if not args.auth_command or args.auth_command == 'status': return _check_auth()
@@ -371,4 +373,13 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\n\033[33m⚠ User Cancelled operations\033[0m")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n\033[31m❌ Fatal Error: {e}\033[0m")
+        # Only show stack trace if DEBUG env var is set
+        if os.environ.get("LANGTUNE_DEBUG"): raise
+        sys.exit(1)
