@@ -320,7 +320,8 @@ def main():
     train.add_argument('--learning-rate', type=float); train.add_argument('--epochs', type=int)
     train.add_argument('--resume-from', type=str)
     
-    subparsers.add_parser('evaluate').add_argument('--config'); subparsers.add_parser('evaluate').add_argument('--model-path')
+    evaluate = subparsers.add_parser('evaluate')
+    evaluate.add_argument('--config'); evaluate.add_argument('--model-path')
     gen = subparsers.add_parser('generate')
     gen.add_argument('--config'); gen.add_argument('--model-path'); gen.add_argument('--prompt')
     

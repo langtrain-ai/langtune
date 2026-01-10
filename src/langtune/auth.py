@@ -429,6 +429,6 @@ def logout():
         CACHE_FILE.unlink()
     
     if RICH_AVAILABLE:
-        console.print("[green]✓[/] Logged out successfully. API key removed from ~/.langtune/config.json")
+        console.print("[green]✓[/] Logged out successfully. API key removed.")
     else:
-        print("✓ Logged out successfully. API key removed from ~/.langtune/config.json")
+        print("✓ Logged out successfully. API key removed.")
