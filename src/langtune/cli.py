@@ -58,23 +58,27 @@ logger = logging.getLogger(__name__)
 
 def print_banner():
     """Print the unified Langtrain banner."""
-    grid = Table.grid(expand=True)
-    grid.add_column(justify="center", ratio=1)
+    header = Text(justify="center")
     
-    # Combined Logo Text
-    logo_text = Text()
-    logo_text.append("Langtrain", style="primary")
-    logo_text.append(" Tune", style="secondary")
-    
-    grid.add_row(logo_text)
-    grid.add_row(Text(f"v{__version__} • Efficient LLM Fine-Tuning", style="muted"))
+    ascii_art = """
+    __                      __           _     
+   / /   ____ _____  ____ _/ /__________(_)___ 
+  / /   / __ `/ __ \/ __ `/ __/ ___/ __ / / __ \\
+ / /___/ /_/ / / / / /_/ / /_/ /  / /_/ / / / / /
+/_____/\__,_/_/ /_/\__, /\__/_/   \__,_/_/_/ /_/ 
+                  /____/                         
+"""
+    header.append(ascii_art, style="bold primary")
+    header.append("\nLangtune", style="bold secondary")
+    header.append(f" v{__version__}", style="dim white")
+    header.append("\nEfficient LoRA Fine-Tuning", style="muted")
     
     console.print(Panel(
-        grid,
+        header,
         style="primary",
         border_style="primary",
         box=box.ROUNDED,
-        padding=(0, 2)
+        padding=(1, 2)
     ))
 
 def _check_auth():

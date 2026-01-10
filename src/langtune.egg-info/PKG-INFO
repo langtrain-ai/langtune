@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: langtune
-Version: 0.1.22
+Version: 0.1.23
 Summary: Efficient LoRA Fine-Tuning for Large Language Models - Train smarter, not harder.
 Author-email: Pritesh Raj <priteshraj41@gmail.com>
 Maintainer-email: Langtrain AI <contact@langtrain.ai>
