@@ -66,13 +66,24 @@ echo -e "${ACCENT}• Configuring shell access...${RESET}"
 ln -sf "$VENV_DIR/bin/langtune" "$BIN_DIR/langtune"
 
 # 6. Path Check
+# 6. Path Check
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     echo -e "\n${WARNING}Warning: $BIN_DIR is not in your PATH.${RESET}"
     echo -e "Add this to your shell config file (.zshrc or .bashrc):"
     echo -e "${MUTED}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
 fi
 
+# 7. Liveness Check
+echo -e "\n${MUTED}• Verifying installation...${RESET}"
+if "$BIN_DIR/langtune" --version > /dev/null 2>&1; then
+    VERSION=$("$BIN_DIR/langtune" --version)
+    echo -e "${SUCCESS}✔ Verified ${VERSION}${RESET}"
+else
+    echo -e "${WARNING}⚠ Could not execute langtune binary. Please check permissions.${RESET}"
+fi
+
 echo -e "\n${SUCCESS}✔ Installation Complete${RESET}"
+
 echo -e "\n${PRIMARY}Get started:${RESET}"
 echo -e "  ${SECONDARY}langtune auth login${RESET}   Connect your account"
 echo -e "  ${SECONDARY}langtune info${RESET}         Quick start guide\n"
