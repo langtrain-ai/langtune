@@ -306,6 +306,48 @@ def info_command(args):
     console.print("\n[muted]Docs: https://github.com/langtrain-ai/langtune[/]\n")
     return 0
 
+
+def init_command(args):
+    """Handle the init command for interactive setup."""
+    console.print(Panel("Welcome to [bold primary]Langtune[/]! Let's get you set up.", border_style="secondary"))
+    
+    # 1. Check Auth
+    api_key = get_api_key()
+    if not api_key:
+        console.print("[white]First, we need to authenticate you.[/]\n")
+        if not interactive_login():
+             console.print("[error]Authentication failed. Initialisation aborted.[/]")
+             return 1
+    else:
+        console.print("[success]✓ Authentication configured[/]")
+        
+    # 2. Project Setup
+    cwd = os.getcwd()
+    console.print(f"\n[bold]Initializing project in:[/] [white]{cwd}[/]")
+    
+    if os.path.exists("config.yaml"):
+        console.print("[warning]! config.yaml already exists. Skipping creation.[/]")
+    else:
+        from rich.prompt import Confirm, Prompt
+        if Confirm.ask("Create a default configuration file?", default=True):
+             preset = Prompt.ask("Choose a base preset", choices=["tiny", "small", "base", "large"], default="small")
+             config = get_preset_config(preset)
+             save_config(config, "config.yaml")
+             console.print(f"[success]✓ Created config.yaml using '{preset}' preset[/]")
+             
+    # 3. Data Check
+    if not os.path.exists("data"):
+         os.makedirs("data", exist_ok=True)
+         console.print("[success]✓ Created data/ directory[/]")
+         
+    console.print(Panel(
+        "[bold success]You are all set![/]\n\n"
+        "Run [bold white]langtune train --config config.yaml[/] to start fine-tuning.",
+        border_style="success",
+        title="Initialization Complete"
+    ))
+    return 0
+
 def main():
     """Main CLI entry point."""
     print_banner()
@@ -323,6 +365,9 @@ def main():
     parser = argparse.ArgumentParser(description='Langtune: Efficient LoRA Fine-Tuning')
     parser.add_argument('-v', '--version', action='store_true', help='Show version')
     subparsers = parser.add_subparsers(dest='command')
+    
+    # Add init command
+    subparsers.add_parser('init', help='Initialize a new Langtune project')
     
     auth_parser = subparsers.add_parser('auth')
     auth_sub = auth_parser.add_subparsers(dest='auth_command')
@@ -352,6 +397,8 @@ def main():
         from .rich_help import print_rich_help
         print_rich_help(parser)
         return 0
+    
+    if args.command == 'init': return init_command(args)
         
     if args.command == 'auth':
         if not args.auth_command or args.auth_command == 'status': return _check_auth()
