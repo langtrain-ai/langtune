@@ -219,15 +219,54 @@ def verify_api_key(api_key: str, force_refresh: bool = False) -> Dict[str, Any]:
         )
 
 
+def get_remote_usage(api_key: str) -> Dict[str, Any]:
+    """Fetch usage stats from API."""
+    if not REQUESTS_AVAILABLE: return {}
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        resp = requests.get(USAGE_ENDPOINT, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return {}
+
+
 def check_usage(api_key: str) -> Dict[str, Any]:
     """Check current usage against limits."""
     user_data = verify_api_key(api_key)
-    usage = user_data.get("usage", {})
     
-    tokens_used = usage.get("tokens_used", 0)
-    tokens_limit = usage.get("tokens_limit", 100000)
-    requests_used = usage.get("requests_used", 0)
-    requests_limit = usage.get("requests_limit", 1000)
+    # Fetch real usage if online
+    remote_data = get_remote_usage(api_key)
+    
+    # Parse remote quotas if available
+    tokens_used = 0
+    tokens_limit = 100000
+    requests_used = 0
+    requests_limit = 1000
+    plan = user_data.get("plan", "free")
+    
+    if remote_data and "quotas" in remote_data:
+        quotas = remote_data["quotas"]
+        # Tokens
+        if "tokens" in quotas:
+            t = quotas["tokens"]
+            tokens_used = t.get("current_usage", 0)
+            tokens_limit = t.get("limit", 100000)
+        # Requests (if applicable)
+        if "requests" in quotas:
+            r = quotas["requests"]
+            requests_used = r.get("current_usage", 0)
+            requests_limit = r.get("limit", 1000)
+            
+        plan = remote_data.get("plan", plan)
+    else:
+        # Fallback to verify_api_key mocks or limits
+        usage = user_data.get("usage", {})
+        tokens_used = usage.get("tokens_used", 0)
+        tokens_limit = usage.get("tokens_limit", 100000)
+        requests_used = usage.get("requests_used", 0)
+        requests_limit = usage.get("requests_limit", 1000)
     
     if tokens_used >= tokens_limit:
         raise UsageLimitError(
@@ -248,7 +287,7 @@ def check_usage(api_key: str) -> Dict[str, Any]:
         "requests_used": requests_used,
         "requests_limit": requests_limit,
         "requests_remaining": requests_limit - requests_used,
-        "plan": user_data.get("plan", "free")
+        "plan": plan
     }
 
 
@@ -404,11 +443,11 @@ def interactive_login():
         
         if RICH_AVAILABLE:
             console.print(f"\n[bold green]✓ Authentication successful![/]")
-            console.print(f"[dim]Plan:[/] [bold]{user_data.get('plan', 'free').title()}[/]")
+            print_usage_info()
             console.print(f"\n[dim]You're ready to use Langtune. Run[/] [cyan]langtune info[/] [dim]to get started.[/]\n")
         else:
             print(f"\n✓ Authentication successful!")
-            print(f"Plan: {user_data.get('plan', 'free').title()}")
+            print_usage_info()
             print(f"\nYou're ready to use Langtune. Run 'langtune info' to get started.\n")
         
         return True
