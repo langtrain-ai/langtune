@@ -342,7 +342,9 @@ def main():
     gen = subparsers.add_parser('generate')
     gen.add_argument('--config'); gen.add_argument('--model-path'); gen.add_argument('--prompt')
     
-    parser.add_parser('concept').add_argument('--concept', type=str, required=True)
+    # Concept subcommand
+    concept_parser = subparsers.add_parser('concept', help='Manage concepts')
+    concept_parser.add_argument('--concept', type=str, required=True, help='Concept name')
     
     args = parser.parse_args()
     
