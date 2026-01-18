@@ -17,6 +17,7 @@ import torch.nn.functional as F
 from torch.cuda.amp import autocast, GradScaler
 from typing import Optional, Tuple, Dict, Any, Union
 import logging
+from .device import DeviceManager
 
 logger = logging.getLogger(__name__)
 
@@ -617,7 +618,7 @@ class GradientCheckpointFunction(torch.autograd.Function):
         if preserve_rng_state:
             ctx.fwd_cpu_state = torch.get_rng_state()
             ctx.had_cuda_in_fwd = False
-            if torch.cuda.is_available():
+            if DeviceManager.is_cuda() or DeviceManager.is_mps():
                 ctx.had_cuda_in_fwd = True
                 ctx.fwd_gpu_devices, ctx.fwd_gpu_states = get_device_states(*args)
         
@@ -673,16 +674,16 @@ class GradientCheckpointFunction(torch.autograd.Function):
 
 
 def get_device_states(*args):
-    """Get CUDA RNG state for gradient checkpointing."""
+    """Get Device RNG state for gradient checkpointing."""
     fwd_gpu_devices = []
     fwd_gpu_states = []
     
     for arg in args:
-        if isinstance(arg, torch.Tensor) and arg.is_cuda:
+        if isinstance(arg, torch.Tensor) and (arg.is_cuda or arg.device.type == 'mps'):
             device = arg.device
             if device not in fwd_gpu_devices:
                 fwd_gpu_devices.append(device)
-                fwd_gpu_states.append(torch.cuda.get_rng_state(device))
+                fwd_gpu_states.append(DeviceManager.get_rng_state(device))
     
     return fwd_gpu_devices, fwd_gpu_states
 
@@ -723,16 +724,20 @@ class MixedPrecisionTrainer:
         backoff_factor: float = 0.5,
         growth_interval: int = 2000
     ):
-        self.enabled = enabled and torch.cuda.is_available()
+        self.enabled = enabled and (DeviceManager.is_cuda() or DeviceManager.is_mps())
         self.dtype = dtype
         
         if self.enabled:
-            self.scaler = GradScaler(
-                init_scale=init_scale,
-                growth_factor=growth_factor,
-                backoff_factor=backoff_factor,
-                growth_interval=growth_interval
-            )
+            # TODO: Add MPS scaler support when stable in PyTorch
+            if DeviceManager.is_cuda():
+                self.scaler = GradScaler(
+                    init_scale=init_scale,
+                    growth_factor=growth_factor,
+                    backoff_factor=backoff_factor,
+                    growth_interval=growth_interval
+                )
+            else:
+                self.scaler = None
             logger.info(f"Mixed precision training enabled with {dtype}")
         else:
             self.scaler = None
@@ -740,7 +745,7 @@ class MixedPrecisionTrainer:
     @property
     def autocast_context(self):
         """Get autocast context manager."""
-        return autocast(enabled=self.enabled, dtype=self.dtype)
+        return DeviceManager.autocast(enabled=self.enabled, dtype=self.dtype)
     
     def scale_loss(self, loss: torch.Tensor) -> torch.Tensor:
         """Scale loss for gradient stability."""
@@ -774,25 +779,17 @@ class MixedPrecisionTrainer:
 
 def get_memory_stats() -> Dict[str, float]:
     """
-    Get GPU memory statistics.
+    Get GPU/MPS memory statistics.
     
     Returns:
         Dictionary with memory stats in GB
     """
-    if not torch.cuda.is_available():
-        return {}
-    
-    return {
-        'allocated': torch.cuda.memory_allocated() / 1e9,
-        'reserved': torch.cuda.memory_reserved() / 1e9,
-        'max_allocated': torch.cuda.max_memory_allocated() / 1e9,
-        'max_reserved': torch.cuda.max_memory_reserved() / 1e9
-    }
+    return DeviceManager.get_memory_stats()
 
 
 def reset_memory_stats():
     """Reset GPU memory statistics."""
-    if torch.cuda.is_available():
+    if DeviceManager.is_cuda():
         torch.cuda.reset_peak_memory_stats()
 
 

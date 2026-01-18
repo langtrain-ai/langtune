@@ -39,6 +39,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from .device import DeviceManager
 
 logger = logging.getLogger(__name__)
 
@@ -125,9 +126,9 @@ class FineTuneConfig:
         """Auto-configure settings based on hardware."""
         # Auto-detect mixed precision
         if self.mixed_precision == "auto":
-            if torch.cuda.is_available():
-                # Check for bf16 support (Ampere+ GPUs)
-                if torch.cuda.is_bf16_supported():
+            if DeviceManager.is_cuda() or DeviceManager.is_mps():
+                # Check for bf16 support
+                if DeviceManager.is_bf16_supported():
                     self.mixed_precision = "bf16"
                 else:
                     self.mixed_precision = "fp16"
@@ -135,8 +136,10 @@ class FineTuneConfig:
                 self.mixed_precision = "fp32"
         
         # Adjust batch size based on GPU memory
-        if torch.cuda.is_available():
+        # (Currently primarily for CUDA where memory queries are standard)
+        if DeviceManager.is_cuda():
             try:
+                # We can add similar logic for MPS if we can robustly detect total memory
                 gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 if gpu_memory < 8:
                     self.batch_size = min(self.batch_size, 2)
@@ -154,11 +157,7 @@ class FineTuneConfig:
 
 def _get_device() -> torch.device:
     """Get best available device."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+    return DeviceManager.get_device()
 
 
 def _get_preset_model_config(preset: str) -> Dict[str, Any]:
@@ -240,7 +239,7 @@ def _load_training_data(
         shuffle=True,
         collate_fn=collator,
         num_workers=0,
-        pin_memory=torch.cuda.is_available()
+        pin_memory=DeviceManager.is_cuda() # Pin memory mostly beneficial for CUDA copies
     )
     
     return dataloader
