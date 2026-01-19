@@ -19,6 +19,9 @@ from .auth import (
     get_api_key, verify_api_key, check_usage, interactive_login, logout,
     print_usage_info, AuthenticationError, UsageLimitError, require_auth
 )
+from .remote import RemoteTrainer
+from .worker import Worker
+
 
 # Rich imports (Dependency guaranteed by pyproject.toml)
 from rich.console import Console
@@ -133,7 +136,32 @@ def train_command(args):
         return 1
     
     console.print("[primary]Initializing Training Routine...[/]")
+
+    # Check for remote execution
+    if getattr(args, 'remote', False):
+        try:
+            # Load basic config just for remote validation
+            if args.config:
+                config = load_config(args.config)
+            elif args.preset:
+                config = get_preset_config(args.preset)
+            else:
+                 console.print("[error]Error: Remote training requires --config or --preset[/]")
+                 return 1
+            
+            # Allow CLI overrides for remote too
+            if args.epochs: config.training.num_epochs = args.epochs
+            if args.output_dir: config.output_dir = args.output_dir
+            
+            remote_trainer = RemoteTrainer(config)
+            job_id = remote_trainer.submit_job()
+            remote_trainer.stream_logs(job_id)
+            return 0
+        except Exception as e:
+            console.print(f"[bold error]Remote Training Failed:[/] {e}")
+            return 1
     
+    # Local Training Routine below...
     # Load configuration
     if args.config:
         config = load_config(args.config)
@@ -348,6 +376,19 @@ def init_command(args):
     ))
     return 0
 
+def worker_command(args):
+    """Handle the worker command."""
+    if args.worker_command == 'start':
+        try:
+             worker = Worker(token=args.token)
+             worker.start()
+             return 0
+        except Exception as e:
+            console.print(f"[bold error]Worker Exception:[/] {e}")
+            return 1
+    return 0
+
+
 def main():
     """Main CLI entry point."""
     print_banner()
@@ -374,6 +415,12 @@ def main():
     auth_sub.add_parser('login'); auth_sub.add_parser('logout'); auth_sub.add_parser('status')
     
     subparsers.add_parser('version'); subparsers.add_parser('info')
+
+    # Worker command
+    worker_parser = subparsers.add_parser('worker')
+    worker_sub = worker_parser.add_subparsers(dest='worker_command')
+    start_parser = worker_sub.add_parser('start')
+    start_parser.add_argument('--token', type=str, help='API Token override')
     
     train = subparsers.add_parser('train')
     train.add_argument('--config', type=str); train.add_argument('--preset', type=str)
@@ -381,6 +428,7 @@ def main():
     train.add_argument('--output-dir', type=str); train.add_argument('--batch-size', type=int)
     train.add_argument('--learning-rate', type=float); train.add_argument('--epochs', type=int)
     train.add_argument('--resume-from', type=str)
+    train.add_argument('--remote', action='store_true', help='Run training remotely on Langtrain Cloud')
     
     evaluate = subparsers.add_parser('evaluate')
     evaluate.add_argument('--config'); evaluate.add_argument('--model-path')
@@ -416,6 +464,7 @@ def main():
     if args.command == 'evaluate': return evaluate_command(args)
     if args.command == 'generate': return generate_command(args)
     if args.command == 'concept': return concept_command(args)
+    if args.command == 'worker': return worker_command(args)
     
     return 0
 
