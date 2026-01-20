@@ -21,6 +21,7 @@ from .auth import (
 )
 from .remote import RemoteTrainer
 from .worker import Worker
+from .data_engine import quick_scout, DatasetProfile, PruningStrategy
 
 
 # Rich imports (Dependency guaranteed by pyproject.toml)
@@ -388,6 +389,68 @@ def worker_command(args):
             return 1
     return 0
 
+def data_command(args):
+    """Handle the data curation commands."""
+    from pathlib import Path
+    
+    if args.data_command == 'scout':
+        input_path = args.input
+        output_path = args.output or f"{input_path}.profile.json"
+        
+        console.print(f"[primary]Running Scout Pass on {input_path}...[/]")
+        
+        try:
+            profile = quick_scout(input_path, output_path)
+            
+            # Display stats
+            stats = profile.stats
+            table = Table(title="Scout Pass Results", box=box.ROUNDED)
+            table.add_column("Metric", style="secondary")
+            table.add_column("Value", style="info")
+            
+            table.add_row("Total Rows", str(profile.total_rows))
+            table.add_row("Mean Loss", f"{stats.get('mean_loss', 0):.3f}")
+            table.add_row("Trivial (skip)", str(stats.get('trivial_count', 0)))
+            table.add_row("Easy", str(stats.get('easy_count', 0)))
+            table.add_row("Medium (optimal)", str(stats.get('medium_count', 0)))
+            table.add_row("Hard", str(stats.get('hard_count', 0)))
+            table.add_row("Noise (skip)", str(stats.get('noise_count', 0)))
+            
+            console.print(table)
+            console.print(f"[success]✓ Profile saved to {output_path}[/]")
+            return 0
+        except Exception as e:
+            console.print(f"[error]Scout failed: {e}[/]")
+            return 1
+    
+    elif args.data_command == 'prune':
+        input_path = args.input
+        profile_path = args.profile or f"{input_path}.profile.json"
+        output_path = args.output or f"{input_path.rsplit('.', 1)[0]}_curated.jsonl"
+        
+        min_loss = args.min_loss or 1.0
+        max_loss = args.max_loss or 5.0
+        
+        console.print(f"[primary]Pruning {input_path} with thresholds [{min_loss}, {max_loss}]...[/]")
+        
+        try:
+            profile = DatasetProfile.load(Path(profile_path))
+            strategy = PruningStrategy(min_loss=min_loss, max_loss=max_loss)
+            indices = strategy.apply(profile)
+            strategy.extract_subset(Path(input_path), indices, Path(output_path))
+            
+            console.print(f"[success]✓ Curated dataset saved to {output_path}[/]")
+            console.print(f"[muted]Kept {len(indices)}/{profile.total_rows} rows ({len(indices)/profile.total_rows*100:.1f}%)[/]")
+            return 0
+        except FileNotFoundError:
+            console.print(f"[error]Profile not found: {profile_path}. Run 'langtune data scout' first.[/]")
+            return 1
+        except Exception as e:
+            console.print(f"[error]Prune failed: {e}[/]")
+            return 1
+    
+    return 0
+
 
 def main():
     """Main CLI entry point."""
@@ -415,6 +478,21 @@ def main():
     auth_sub.add_parser('login'); auth_sub.add_parser('logout'); auth_sub.add_parser('status')
     
     subparsers.add_parser('version'); subparsers.add_parser('info')
+
+    # Data curation command
+    data_parser = subparsers.add_parser('data', help='Data curation tools')
+    data_sub = data_parser.add_subparsers(dest='data_command')
+    
+    scout_parser = data_sub.add_parser('scout', help='Analyze dataset difficulty')
+    scout_parser.add_argument('--input', '-i', type=str, required=True, help='Input JSONL file')
+    scout_parser.add_argument('--output', '-o', type=str, help='Output profile path')
+    
+    prune_parser = data_sub.add_parser('prune', help='Create curated subset')
+    prune_parser.add_argument('--input', '-i', type=str, required=True, help='Input JSONL file')
+    prune_parser.add_argument('--profile', '-p', type=str, help='Profile JSON from scout')
+    prune_parser.add_argument('--output', '-o', type=str, help='Output curated JSONL')
+    prune_parser.add_argument('--min-loss', type=float, default=1.0, help='Min loss threshold')
+    prune_parser.add_argument('--max-loss', type=float, default=5.0, help='Max loss threshold')
 
     # Worker command
     worker_parser = subparsers.add_parser('worker')
@@ -465,6 +543,7 @@ def main():
     if args.command == 'generate': return generate_command(args)
     if args.command == 'concept': return concept_command(args)
     if args.command == 'worker': return worker_command(args)
+    if args.command == 'data': return data_command(args)
     
     return 0
 
