@@ -34,11 +34,33 @@ class ModelConfig:
     max_seq_len: int = 512
     mlp_ratio: float = 4.0
     dropout: float = 0.1
+@dataclass
+class QuantizationConfig:
+    """Quantization configuration."""
+    enabled: bool = False
+    bits: int = 4  # 4 or 8
+    block_size: int = 64
+
+@dataclass
+class ModelConfig:
+    """Model architecture configuration."""
+    vocab_size: int = 32000
+    embed_dim: int = 512
+    num_layers: int = 6
+    num_heads: int = 8
+    max_seq_len: int = 512
+    mlp_ratio: float = 4.0
+    dropout: float = 0.1
     lora: LoRAConfig = None
+    quantization: QuantizationConfig = None
     
     def __post_init__(self):
         if self.lora is None:
             self.lora = LoRAConfig()
+        if self.quantization is None:
+            self.quantization = QuantizationConfig()
+        elif isinstance(self.quantization, dict):
+            self.quantization = QuantizationConfig(**self.quantization)
 
 @dataclass
 class TrainingConfig:
@@ -57,6 +79,10 @@ class TrainingConfig:
     save_total_limit: int = 3
     early_stopping_patience: int = 5
     early_stopping_threshold: float = 0.001
+    # AirTun / Efficiency
+    use_airtun: bool = False
+    offload_optimizer: bool = False
+    offload_dir: Optional[str] = None
 
 @dataclass
 class DataConfig:

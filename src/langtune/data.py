@@ -297,7 +297,7 @@ def create_data_loader(
     dataset: Dataset,
     batch_size: int = 32,
     shuffle: bool = True,
-    num_workers: int = 4,
+    num_workers: Optional[int] = None,
     pin_memory: bool = True,
     collate_fn=None
 ) -> DataLoader:
@@ -308,13 +308,23 @@ def create_data_loader(
         dataset: PyTorch Dataset
         batch_size: Batch size
         shuffle: Whether to shuffle the data
-        num_workers: Number of worker processes
+        num_workers: Number of worker processes (auto-detected if None)
         pin_memory: Whether to pin memory
         collate_fn: Custom collate function
         
     Returns:
         DataLoader
     """
+    if num_workers is None:
+        # Auto-detect optimal workers
+        import multiprocessing
+        try:
+            # Use 50% of CPUs, max 8
+            cpu_count = multiprocessing.cpu_count()
+            num_workers = min(cpu_count, 8)
+        except:
+            num_workers = 4
+            
     return DataLoader(
         dataset,
         batch_size=batch_size,

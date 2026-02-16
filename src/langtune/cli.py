@@ -207,8 +207,19 @@ def train_command(args):
         console.print(f"[success]✓[/] Loaded {len(train_dataset)} training examples")
 
         collate_fn = DataCollator()
-        train_dataloader = create_data_loader(train_dataset, batch_size=config.training.batch_size, shuffle=True, collate_fn=collate_fn)
-        val_dataloader = create_data_loader(val_dataset, batch_size=config.training.batch_size, shuffle=False, collate_fn=collate_fn) if val_dataset else None
+        # let create_data_loader determine optimal workers
+        train_dataloader = create_data_loader(
+            train_dataset, 
+            batch_size=config.training.batch_size, 
+            shuffle=True, 
+            collate_fn=collate_fn
+        )
+        val_dataloader = create_data_loader(
+            val_dataset, 
+            batch_size=config.training.batch_size, 
+            shuffle=False, 
+            collate_fn=collate_fn
+        ) if val_dataset else None
         
         trainer = create_trainer(config=config, train_dataloader=train_dataloader, val_dataloader=val_dataloader)
         trainer.train(resume_from_checkpoint=args.resume_from)

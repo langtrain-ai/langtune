@@ -245,6 +245,57 @@ class WandbCallback(Callback):
             self.wandb.finish()
 
 
+        if self.wandb:
+            self.wandb.finish()
+
+
+class RedisCallback(Callback):
+    """
+    Publishes training metrics to Redis Pub/Sub for real-time dashboard updates.
+    The 'Nervous System' signal generator.
+    """
+    def __init__(self, channel: str = "langtrain:events", redis_url: str = "redis://localhost:6379/0"):
+        self.channel = channel
+        self.redis_url = redis_url
+        self.redis = None
+        self.run_id = f"run_{int(time.time())}"
+        
+    def on_train_begin(self, trainer, **kwargs):
+        try:
+            import redis
+            self.redis = redis.from_url(self.redis_url)
+            self._publish("status", "started")
+        except ImportError:
+            logger.warning("redis-py not installed, skipping Redis real-time logging")
+        except Exception as e:
+            logger.warning(f"Failed to connect to Redis: {e}")
+
+    def on_batch_end(self, trainer, batch_idx: int, loss: float, **kwargs):
+        if self.redis:
+            self._publish("metric", {"step": batch_idx, "loss": loss})
+
+    def on_epoch_end(self, trainer, epoch: int, metrics: Dict[str, float], **kwargs):
+        if self.redis:
+            self._publish("epoch", {"epoch": epoch + 1, **metrics})
+
+    def on_train_end(self, trainer, **kwargs):
+        if self.redis:
+            self._publish("status", "completed")
+            self.redis.close()
+
+    def _publish(self, type_: str, payload: Any):
+        try:
+            message = json.dumps({
+                "run_id": self.run_id,
+                "timestamp": time.time(),
+                "type": type_,
+                "payload": payload
+            })
+            self.redis.publish(self.channel, message)
+        except Exception as e:
+            logger.debug(f"Redis publish failed: {e}")
+
+
 # Default callback presets
 def get_default_callbacks() -> CallbackList:
     """Get a list of recommended default callbacks."""
@@ -252,7 +303,8 @@ def get_default_callbacks() -> CallbackList:
         ModelSizeCallback(),
         ProgressCallback(log_every=10),
         TimerCallback(),
-        LearningRateMonitorCallback()
+        LearningRateMonitorCallback(),
+        # RedisCallback() # Optional, enable if needed
     ])
 
 
@@ -264,5 +316,6 @@ def get_verbose_callbacks() -> CallbackList:
         TimerCallback(),
         LearningRateMonitorCallback(),
         GradientMonitorCallback(log_every=50),
-        MemoryMonitorCallback(log_every=50)
+        MemoryMonitorCallback(log_every=50),
+        RedisCallback() # Enable for verbose/realtime monitoring
     ])

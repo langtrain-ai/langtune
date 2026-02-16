@@ -203,49 +203,72 @@ class LangtuneClient:
         method: str,
         endpoint: str,
         data: Optional[Dict] = None,
-        files: Optional[Dict] = None
+        files: Optional[Dict] = None,
+        _retries: int = 3
     ) -> Dict[str, Any]:
-        """Make an API request."""
+        """Make an API request with automatic retry on transient errors."""
         try:
             import requests
         except ImportError:
             raise ImportError("requests library required. Install with: pip install requests")
         
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        retryable_statuses = {429, 500, 502, 503, 504}
+        last_error = None
         
-        try:
-            if files:
-                # Multipart form data
-                response = requests.request(
-                    method,
-                    url,
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                    files=files,
-                    data=data,
-                    timeout=self.timeout
-                )
-            else:
-                response = requests.request(
-                    method,
-                    url,
-                    headers=self._get_headers(),
-                    json=data,
-                    timeout=self.timeout
-                )
-            
-            response.raise_for_status()
-            return response.json()
-        
-        except requests.exceptions.HTTPError as e:
-            error_msg = str(e)
+        for attempt in range(_retries):
             try:
-                error_data = e.response.json()
-                error_msg = error_data.get("error", {}).get("message", str(e))
-            except:
-                pass
-            raise APIError(f"API error: {error_msg}")
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Connection error: {e}")
+                if files:
+                    response = requests.request(
+                        method,
+                        url,
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        files=files,
+                        data=data,
+                        timeout=self.timeout
+                    )
+                else:
+                    response = requests.request(
+                        method,
+                        url,
+                        headers=self._get_headers(),
+                        json=data,
+                        timeout=self.timeout
+                    )
+                
+                if response.status_code in retryable_statuses and attempt < _retries - 1:
+                    wait = min(2 ** attempt, 8)
+                    logger.warning(f"Retryable error {response.status_code}, retrying in {wait}s (attempt {attempt + 1}/{_retries})")
+                    time.sleep(wait)
+                    continue
+                
+                response.raise_for_status()
+                return response.json()
+            
+            except requests.exceptions.HTTPError as e:
+                error_msg = str(e)
+                try:
+                    error_data = e.response.json()
+                    error_msg = error_data.get("error", {}).get("message", str(e))
+                except:
+                    pass
+                last_error = APIError(f"API error: {error_msg}")
+                
+                if e.response.status_code not in retryable_statuses:
+                    raise last_error
+                    
+            except requests.exceptions.ConnectionError as e:
+                last_error = ConnectionError(f"Connection error: {e}")
+                if attempt < _retries - 1:
+                    wait = min(2 ** attempt, 8)
+                    logger.warning(f"Connection error, retrying in {wait}s (attempt {attempt + 1}/{_retries})")
+                    time.sleep(wait)
+                    continue
+            
+            except requests.exceptions.RequestException as e:
+                raise ConnectionError(f"Request error: {e}")
+        
+        raise last_error
     
     # ==================== Fine-tuning ====================
     
