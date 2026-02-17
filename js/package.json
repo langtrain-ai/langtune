@@ -1,0 +1,33 @@
+{
+  "name": "langtune",
+  "version": "0.1.0",
+  "description": "JavaScript SDK for Langtune",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "langtune",
+    "sdk",
+    "ai",
+    "llm",
+    "finetuning",
+    "text",
+    "lora"
+  ],
+  "author": "Langtrain AI",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "execa": "^8.0.1",
+    "zod": "^3.22.4"
+  }
+}

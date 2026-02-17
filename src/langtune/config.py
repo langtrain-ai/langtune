@@ -83,6 +83,9 @@ class TrainingConfig:
     use_airtun: bool = False
     offload_optimizer: bool = False
     offload_dir: Optional[str] = None
+    
+    # Triton Kernels
+    use_triton: bool = False
 
 @dataclass
 class DataConfig:

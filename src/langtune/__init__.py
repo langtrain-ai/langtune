@@ -188,8 +188,8 @@ from .data import (
 
 # Training
 from .trainer import (
-    Trainer, FastTrainer, EarlyStopping, MetricsTracker, ModelCheckpoint,
-    create_trainer, create_fast_trainer
+    Trainer, EarlyStopping, MetricsTracker, ModelCheckpoint,
+    create_trainer
 )
 
 # Fine-tuning (best-practice API)
@@ -284,8 +284,8 @@ __all__ = [
     "SimpleTokenizer", "create_sample_dataset", "load_dataset_from_config",
     
     # Training
-    "Trainer", "FastTrainer", "EarlyStopping", "MetricsTracker", "ModelCheckpoint",
-    "create_trainer", "create_fast_trainer",
+    "Trainer", "EarlyStopping", "MetricsTracker", "ModelCheckpoint",
+    "create_trainer",
     
     # Fine-tuning
     "finetune", "finetune_from_config", "FineTuneConfig", "train", "fine_tune",

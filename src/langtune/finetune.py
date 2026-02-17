@@ -137,10 +137,9 @@ class FineTuneConfig:
         
         # Adjust batch size based on GPU memory
         # (Currently primarily for CUDA where memory queries are standard)
-        if DeviceManager.is_cuda():
+        if DeviceManager.is_cuda() or DeviceManager.is_mps():
             try:
-                # We can add similar logic for MPS if we can robustly detect total memory
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                gpu_memory = DeviceManager.get_total_memory()
                 if gpu_memory < 8:
                     self.batch_size = min(self.batch_size, 2)
                     self.gradient_accumulation_steps = max(self.gradient_accumulation_steps, 8)
@@ -155,52 +154,12 @@ class FineTuneConfig:
                    f"gradient_accumulation={self.gradient_accumulation_steps}")
 
 
+from .presets import get_preset_model_config
+
 def _get_device() -> torch.device:
     """Get best available device."""
     return DeviceManager.get_device()
 
-
-def _get_preset_model_config(preset: str) -> Dict[str, Any]:
-    """Get model configuration from preset."""
-    presets = {
-        "tiny": {
-            "vocab_size": 32000,
-            "embed_dim": 128,
-            "num_layers": 2,
-            "num_heads": 4,
-            "mlp_ratio": 4.0,
-            "dropout": 0.1
-        },
-        "small": {
-            "vocab_size": 32000,
-            "embed_dim": 256,
-            "num_layers": 4,
-            "num_heads": 8,
-            "mlp_ratio": 4.0,
-            "dropout": 0.1
-        },
-        "base": {
-            "vocab_size": 32000,
-            "embed_dim": 512,
-            "num_layers": 6,
-            "num_heads": 8,
-            "mlp_ratio": 4.0,
-            "dropout": 0.1
-        },
-        "large": {
-            "vocab_size": 32000,
-            "embed_dim": 768,
-            "num_layers": 12,
-            "num_heads": 12,
-            "mlp_ratio": 4.0,
-            "dropout": 0.1
-        }
-    }
-    
-    if preset not in presets:
-        raise ValueError(f"Unknown preset: {preset}. Options: {list(presets.keys())}")
-    
-    return presets[preset]
 
 
 def _load_training_data(
@@ -361,7 +320,7 @@ def finetune(
                f"grad_ckpt={use_gradient_checkpointing}, mixed_precision={config.mixed_precision}")
     
     # Get model config from preset
-    model_config = _get_preset_model_config(preset)
+    model_config = get_preset_model_config(preset)
     model_config["max_seq_len"] = max_seq_len
     
     # Create LoRA config

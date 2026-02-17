@@ -319,11 +319,16 @@ def log_gpu_memory():
         reserved = torch.cuda.memory_reserved() / 1024**3   # GB
         logger.info(f"GPU Memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB")
 
-def cleanup_gpu_memory():
-    """Clean up GPU memory."""
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        logger.info("GPU memory cleaned up")
+
+def cleanup_memory():
+    """Clean up memory on the current device."""
+    from .device import DeviceManager
+    DeviceManager.empty_cache()
+    logger.info("Device memory cleaned up")
+
+# Backward compatibility
+cleanup_gpu_memory = cleanup_memory
+
 
 # Backward compatibility
 def encode_text_legacy(text, tokenizer=None):

@@ -62,6 +62,17 @@ class DeviceManager:
         return stats
 
     @staticmethod
+    def get_total_memory() -> float:
+        """Get total memory in GB."""
+        if DeviceManager.is_cuda():
+            return torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        elif DeviceManager.is_mps():
+            # MPS doesn't expose total memory easily via PyTorch yet
+            # Return a reasonable default or try psutil if strictly needed
+            return 16.0 # Assumption for Apple Silicon
+        return 0.0
+
+    @staticmethod
     def empty_cache():
         if DeviceManager.is_cuda():
             torch.cuda.empty_cache()
