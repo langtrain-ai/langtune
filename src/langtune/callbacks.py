@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, List, Callable
 from pathlib import Path
 import json
 import time
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,59 @@ class WandbCallback(Callback):
 
         if self.wandb:
             self.wandb.finish()
+
+
+class ServerTelemetryCallback(Callback):
+    """
+    Streams training metrics directly to langtrain-server via HTTP POST.
+    """
+    def __init__(self, api_url: str, job_id: str, log_every: int = 10):
+        self.api_url = api_url.rstrip('/')
+        self.job_id = job_id
+        self.log_every = log_every
+        self.step = 0
+        self.api_token = None # Optional: Set from env if needed for auth
+        
+    def _send_telemetry(self, payload: Dict[str, Any]):
+        try:
+            headers = {"Content-Type": "application/json"}
+            if self.api_token:
+                headers["Authorization"] = f"Bearer {self.api_token}"
+                
+            requests.post(
+                f"{self.api_url}/v1/training/jobs/{self.job_id}/telemetry",
+                json=payload,
+                headers=headers,
+                timeout=2.0
+            )
+        except Exception as e:
+            logger.debug(f"Telemetry failed to send: {e}")
+
+    def on_batch_end(self, trainer, batch_idx: int, loss: float, **kwargs):
+        self.step += 1
+        if self.step % self.log_every == 0:
+            lr = trainer.optimizer.param_groups[0]['lr'] if hasattr(trainer, 'optimizer') else None
+            self._send_telemetry({
+                "step": self.step,
+                "loss": loss,
+                "learning_rate": lr
+            })
+
+    def on_epoch_end(self, trainer, epoch: int, metrics: Dict[str, float], **kwargs):
+        self._send_telemetry({
+            "step": self.step,
+            "loss": metrics.get("train_loss", 0.0),
+            "epoch": epoch + 1,
+            "log_message": f"Epoch {epoch + 1} completed"
+        })
+
+    def on_train_end(self, trainer, **kwargs):
+        self._send_telemetry({
+            "step": self.step,
+            "loss": 0.0,
+            "progress": 100,
+            "log_message": "Training completed"
+        })
 
 
 class RedisCallback(Callback):
