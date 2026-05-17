@@ -307,9 +307,45 @@ __all__ = [
     
     # Facades
     "LoRATrainer", "QLoRATrainer", "ChatModel", "deploy",
-    
+
+    # GPU detection
+    "get_gpu_info", "auto_config", "print_gpu_info", "GPUInfo",
+
+    # FastLanguageModel — Unsloth-style high-level API
+    "FastLanguageModel",
+    "LangtrainServerClient",
+    "RemoteJob",
+    "TrainingStep",
+    "LangtuneSFTTrainer",
+
+    # Kernel utilities
+    "apply_langtune_kernels",
+    "print_kernel_status",
+    "kernel_status",
+
     # Version
     "__version__"
 ]
+
+# ── GPU Detection & Auto-Config ───────────────────────────────────────────────
+from .gpu_info import get_gpu_info, auto_config, print_gpu_info, GPUInfo
+
+# ── FastLanguageModel (Unsloth-compatible high-level API) ────────────────────
+try:
+    from .fast_model import (
+        FastLanguageModel,
+        LangtrainServerClient,
+        RemoteJob,
+        TrainingStep,
+    )
+    from .kernels import (
+        LangtuneSFTTrainer,
+        apply_langtune_kernels,
+        print_kernel_status,
+        kernel_status,
+    )
+except ImportError as _e:
+    import warnings
+    warnings.warn(f"FastLanguageModel not available: {_e}", ImportWarning, stacklevel=2)
 
 

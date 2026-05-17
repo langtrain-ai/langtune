@@ -7,3 +7,18 @@ env/
 venv/
 .env
 .DS_Store
+
+# VSCode local file history
+.history/
+
+# IDE directories
+.idea/
+.vscode/
+
+# Python build artifacts
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
