@@ -1,3 +1,9 @@
+> **Note:** `langtune` is now part of the unified [`langtrain`](https://github.com/langtrain-ai/langtrain-py) SDK.
+> `pip install langtrain[train]` includes everything from langtune plus AdaptiveRank, DatasetIntelligence, and vision LLM support.
+> langtune continues to receive updates and remains fully supported.
+
+---
+
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-white.png" alt="Langtune" width="400" />
