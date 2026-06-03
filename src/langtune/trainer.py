@@ -28,10 +28,6 @@ from .fast_lora import FastLoRAConfig, apply_fast_lora, get_lora_state_dict
 from .packing import SequencePacker
 from .lisa import LISA
 from .kernels import fused_cross_entropy
-try:
-    from .triton_kernels import triton_cross_entropy
-except ImportError:
-    triton_cross_entropy = None
 
 logger = logging.getLogger(__name__)
 
@@ -286,17 +282,7 @@ class Trainer:
         with self._autocast():
             outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
             
-            # Use Fused Cross Entropy
-            if getattr(self.config.training, 'use_triton', False) and triton_cross_entropy is not None:
-                # Triton kernel (forward pass only for now, autograd handled by wrapping if needed)
-                # But our implementation in triton_kernels.py provided a naive forward function 
-                # AND a TritonCrossEntropyLoss autograd function.
-                # Let's use the autograd function wrapper if available.
-                from .triton_kernels import TritonCrossEntropyLoss
-                loss = TritonCrossEntropyLoss.apply(outputs.logits, labels)
-            else:
-                # Fallback to Compile-Fused or Standard
-                loss = fused_cross_entropy(outputs.logits, labels)
+            loss = fused_cross_entropy(outputs.logits, labels)
             
             if self.config.gradient_accumulation_steps > 1:
                 loss = loss / self.config.gradient_accumulation_steps
