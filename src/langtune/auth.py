@@ -35,7 +35,7 @@ except ImportError:
 # API configuration
 # Allow overriding for local development (e.g. http://localhost:3000)
 API_BASE_URL = os.environ.get("LANGTRAIN_API_URL", "https://api.langtrain.xyz")
-AUTH_ENDPOINT = f"{API_BASE_URL}/api/v1/auth/verify" # Ensure path matches Next.js route
+AUTH_ENDPOINT = f"{API_BASE_URL}/api/v1/auth/api-keys/validate"
 USAGE_ENDPOINT = f"{API_BASE_URL}/api/v1/usage"
 
 # Config paths
@@ -155,7 +155,7 @@ def verify_api_key(api_key: str, force_refresh: bool = False) -> Dict[str, Any]:
     # In production, this would make an actual API call
     if not REQUESTS_AVAILABLE:
         # Offline verification - accept keys that match pattern
-        if api_key.startswith("lt_") and len(api_key) >= 32:
+        if api_key.startswith(("sk-lt-", "lt_")) and len(api_key) >= 32:
             user_data = {
                 "valid": True,
                 "user_id": key_hash,
@@ -177,14 +177,13 @@ def verify_api_key(api_key: str, force_refresh: bool = False) -> Dict[str, Any]:
             return user_data
         else:
             raise AuthenticationError(
-                "Invalid API key format. Keys should start with 'lt_' and be at least 32 characters.\n"
+                "Invalid API key format. Keys start with 'sk-lt-'.\n"
                 "Get your API key at: https://app.langtrain.xyz"
             )
     
     # Make API call to verify key
     try:
-        headers = {"Authorization": f"Bearer {api_key}"}
-        response = requests.post(AUTH_ENDPOINT, headers=headers, timeout=10)
+        response = requests.post(AUTH_ENDPOINT, params={"api_key": api_key}, timeout=10)
         
         if response.status_code == 200:
             user_data = response.json()
@@ -223,8 +222,7 @@ def get_remote_usage(api_key: str) -> Dict[str, Any]:
     """Fetch usage stats from API."""
     if not REQUESTS_AVAILABLE: return {}
     try:
-        headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get(USAGE_ENDPOINT, headers=headers, timeout=5)
+        resp = requests.get(USAGE_ENDPOINT, headers={"X-API-Key": api_key}, timeout=5)
         if resp.status_code == 200:
             return resp.json()
     except Exception:

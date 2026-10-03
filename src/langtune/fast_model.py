@@ -21,7 +21,7 @@ Usage:
     # Remote — dispatches to langtrain-server
     model, tokenizer = FastLanguageModel.from_pretrained(
         "meta-llama/Llama-3.1-8B",
-        api_key="lt_...",        # triggers remote mode
+        api_key="sk-lt-...",     # triggers remote mode
         load_in_4bit=True,
     )
     model = FastLanguageModel.get_peft_model(model, r=16, method="qlora")
@@ -125,9 +125,12 @@ class RemoteJob:
         """Cancel the remote job."""
         return self._client.cancel_job(self.job_id)
 
-    def download(self, output_dir: str = "./model") -> str:
-        """Download the trained model adapter to output_dir."""
-        return self._client.download_model(self.job_id, output_dir)
+    def export(self, repo_id: str, private: bool = True, hf_token: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Push the finished model to a Hugging Face repo you own, then load it
+        anywhere with from_pretrained(repo_id).
+        """
+        return self._client.export_to_hub(self.job_id, repo_id, private=private, hf_token=hf_token)
 
     def __repr__(self) -> str:
         return f"RemoteJob(id={self.job_id!r})"
@@ -139,93 +142,101 @@ class RemoteJob:
 
 class LangtrainServerClient:
     """
-    Thin HTTP client for langtrain-server.
-    Used by FastLanguageModel in remote mode.
+    Thin HTTP client for langtrain-server's training API
+    (https://api.langtrain.xyz/api/v1/training/...), authenticated with an
+    API key in the X-API-Key header. Used by FastLanguageModel in remote mode.
     """
 
     DEFAULT_BASE_URL = "https://api.langtrain.xyz"
+    API_PREFIX = "/api/v1"
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
         self.api_key = api_key
         self.base_url = (base_url or os.environ.get("LANGTRAIN_BASE_URL") or self.DEFAULT_BASE_URL).rstrip("/")
         self._session = None
 
+    def _url(self, path: str) -> str:
+        return f"{self.base_url}{self.API_PREFIX}{path}"
+
     def _get_session(self):
         if self._session is None:
             import requests
             s = requests.Session()
             s.headers.update({
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
+                "X-API-Key": self.api_key,
                 "X-SDK": "langtune",
             })
             self._session = s
         return self._session
 
-    def _post(self, path: str, payload: Dict) -> Dict:
-        import requests
-        r = self._get_session().post(f"{self.base_url}/v1{path}", json=payload, timeout=60)
+    @staticmethod
+    def _check(r) -> None:
+        if r.status_code == 401:
+            raise PermissionError("Langtrain rejected the API key (401). Create one in the dashboard under API keys.")
         r.raise_for_status()
+
+    def _post(self, path: str, payload: Dict) -> Dict:
+        r = self._get_session().post(self._url(path), json=payload, timeout=60)
+        self._check(r)
         return r.json()
 
     def _get(self, path: str, params: Dict = None) -> Any:
-        import requests
-        r = self._get_session().get(f"{self.base_url}/v1{path}", params=params or {}, timeout=30)
-        r.raise_for_status()
+        r = self._get_session().get(self._url(path), params=params or {}, timeout=30)
+        self._check(r)
         return r.json()
 
     def upload_dataset(self, dataset_path: str, name: str = None) -> str:
-        """Upload a local dataset file, return dataset_id."""
-        import requests
+        """Upload a local dataset file, return its id."""
         with open(dataset_path, "rb") as f:
             r = self._get_session().post(
-                f"{self.base_url}/v1/datasets/upload",
-                files={"file": (os.path.basename(dataset_path), f)},
-                data={"name": name or os.path.basename(dataset_path)},
+                self._url("/files"),
+                files={"file": (name or os.path.basename(dataset_path), f)},
+                params={"purpose": "fine-tune"},
                 timeout=300,
             )
-        r.raise_for_status()
+        if r.status_code in (401, 403):
+            raise PermissionError(
+                "This API key can't upload datasets. Upload the file in the Langtrain "
+                "dashboard, then pass its id: FastLanguageModel.train(..., dataset_id=\"...\")"
+            )
+        self._check(r)
         return r.json()["id"]
 
     def create_job(self, payload: Dict) -> Dict:
-        return self._post("/finetune/jobs", payload)
+        return self._post("/training/jobs", payload)
 
     def get_job(self, job_id: str) -> Dict:
-        return self._get(f"/finetune/jobs/{job_id}")
+        return self._get(f"/training/jobs/{job_id}")
 
     def get_telemetry(self, job_id: str, after_step: int = -1) -> List[Dict]:
+        """The latest metrics the server holds for the job, if newer than after_step."""
         try:
-            return self._get(f"/finetune/jobs/{job_id}/telemetry", {"after_step": after_step}) or []
+            metrics = self.get_job(job_id).get("metrics") or {}
         except Exception:
             return []
+        step = metrics.get("step") or metrics.get("global_step")
+        if step is None or step <= after_step:
+            return []
+        return [{
+            "step": step,
+            "loss": metrics.get("loss", metrics.get("train_loss")),
+            "learning_rate": metrics.get("learning_rate"),
+            "epoch": metrics.get("epoch"),
+        }]
 
     def cancel_job(self, job_id: str) -> bool:
         try:
-            self._post(f"/finetune/jobs/{job_id}/cancel", {})
+            self._post(f"/training/jobs/{job_id}/cancel", {})
             return True
         except Exception:
             return False
 
-    def download_model(self, job_id: str, output_dir: str) -> str:
-        """Download adapter weights from the completed job."""
-        import requests
-        import zipfile
-        os.makedirs(output_dir, exist_ok=True)
-        r = self._get_session().get(
-            f"{self.base_url}/v1/finetune/jobs/{job_id}/download",
-            stream=True,
-            timeout=300,
-        )
-        r.raise_for_status()
-        zip_path = os.path.join(output_dir, "adapter.zip")
-        with open(zip_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(output_dir)
-        os.remove(zip_path)
-        logger.info(f"Model downloaded to {output_dir}")
-        return output_dir
+    def export_to_hub(self, job_id: str, repo_id: str, private: bool = True, hf_token: Optional[str] = None) -> Dict:
+        """Merge the adapter into the base model and push it to a Hugging Face repo you own."""
+        payload: Dict[str, Any] = {"repo_id": repo_id, "private": private, "merge_lora": True}
+        if hf_token:
+            payload["hf_token"] = hf_token
+        return self._post(f"/training/jobs/{job_id}/export", payload)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -301,8 +312,9 @@ class FastLanguageModel:
     Execution modes:
       LOCAL  — pass no api_key (or api_key=None). Trains on local GPU.
                Automatically applies Langtrain Triton kernels if available.
-      REMOTE — pass api_key="lt_...". Dispatches to langtrain-server GPU cloud.
-               Supports all 12 training methods with Modal A10G workers.
+      REMOTE — pass api_key="sk-lt-..." (or remote=True with LANGTRAIN_API_KEY
+               set). Starts the run on Langtrain's GPUs; the dataset must be
+               uploaded in the dashboard first (pass dataset_id=).
 
     Supported training methods:
       'sft', 'lora', 'qlora', 'dora', 'galore', 'ia3', 'prefix',
@@ -316,6 +328,7 @@ class FastLanguageModel:
         model_name: str,
         *,
         api_key: Optional[str] = None,
+        remote: bool = False,
         base_url: Optional[str] = None,
         load_in_4bit: bool = True,
         load_in_8bit: bool = False,
@@ -333,7 +346,10 @@ class FastLanguageModel:
 
         Args:
             model_name: HuggingFace model ID (e.g. "meta-llama/Llama-3.1-8B")
-            api_key: langtrain-server API key. If provided, returns a remote handle.
+            api_key: Langtrain API key. If provided, returns a remote handle.
+            remote: Use the Langtrain cloud with the key in LANGTRAIN_API_KEY.
+                A key in the environment alone never switches to remote mode,
+                so local training isn't sent to the cloud by surprise.
             load_in_4bit: NF4 QLoRA quantization (local mode only)
             load_in_8bit: 8-bit LLM.int8() quantization (local mode only)
             use_flash_attention_2: Enable FlashAttention2 kernel (local mode)
@@ -344,7 +360,9 @@ class FastLanguageModel:
         Returns:
             (model, tokenizer) — In remote mode, model is a _WrappedRemoteModel.
         """
-        _key = api_key or os.environ.get("LANGTRAIN_API_KEY")
+        _key = api_key or (os.environ.get("LANGTRAIN_API_KEY") if remote else None)
+        if remote and not _key:
+            raise ValueError("remote=True needs api_key= or the LANGTRAIN_API_KEY environment variable.")
         hyperparameters = {
             "max_seq_length": max_seq_length,
             "use_flash_attention_2": use_flash_attention_2,
@@ -695,25 +713,25 @@ class FastLanguageModel:
         callbacks,
     ):
         """Run training on the local GPU using TRL + Langtrain Triton kernels."""
-        from trl import SFTConfig, SFTTrainer
+        from langtune._trl_compat import load_trainer, make_config, make_trainer
 
         inner = model._model if isinstance(model, _WrappedLocalModel) else model
 
-        # Fused cross-entropy trainer (26× less VRAM)
-        try:
-            from langtune.kernels import LangtuneSFTTrainer
-            TrainerCls = LangtuneSFTTrainer
-        except ImportError:
-            TrainerCls = SFTTrainer
-
-        is_preference = method in ("dpo", "orpo", "simpo", "kto")
-
-        if is_preference:
+        if method in ("dpo", "orpo", "simpo", "kto"):
             return FastLanguageModel._train_preference_local(
                 inner, tokenizer, dataset, method, output_dir, hyperparameters
             )
 
-        config = SFTConfig(
+        TrainerCls, SFTConfig = load_trainer("SFT")
+        # Fused cross-entropy trainer, when the kernels are available
+        try:
+            from langtune.kernels import _build_langtune_sft_trainer_cls
+            TrainerCls = _build_langtune_sft_trainer_cls()
+        except ImportError:
+            pass
+
+        config = make_config(
+            SFTConfig,
             output_dir=output_dir,
             num_train_epochs=hyperparameters.get("n_epochs", 3),
             per_device_train_batch_size=hyperparameters.get("batch_size", 4),
@@ -732,65 +750,43 @@ class FastLanguageModel:
             save_strategy="epoch",
         )
 
-        trainer = TrainerCls(
+        trainer = make_trainer(
+            TrainerCls, tokenizer,
             model=inner,
             train_dataset=dataset,
             args=config,
-            tokenizer=tokenizer,
             callbacks=callbacks,
         )
 
         return trainer.train()
 
+    # Default learning rate and beta for each preference method.
+    _PREFERENCE_DEFAULTS = {
+        "dpo": ("DPO", 5e-5, 0.1),
+        "orpo": ("ORPO", 8e-6, 0.1),
+        "kto": ("KTO", 5e-6, 0.1),
+        "simpo": ("CPO", 8e-6, 2.0),
+    }
+
     @staticmethod
     def _train_preference_local(inner, tokenizer, dataset, method, output_dir, hp):
-        """Handle preference alignment methods locally."""
-        if method == "dpo":
-            from trl import DPOConfig, DPOTrainer
-            config = DPOConfig(
-                output_dir=output_dir,
-                num_train_epochs=hp.get("n_epochs", 1),
-                per_device_train_batch_size=hp.get("batch_size", 2),
-                learning_rate=hp.get("learning_rate", 5e-5),
-                beta=hp.get("beta", 0.1),
-                bf16=True,
-            )
-            trainer = DPOTrainer(model=inner, train_dataset=dataset, args=config, tokenizer=tokenizer)
-        elif method == "orpo":
-            from trl import ORPOConfig, ORPOTrainer
-            config = ORPOConfig(
-                output_dir=output_dir,
-                num_train_epochs=hp.get("n_epochs", 1),
-                per_device_train_batch_size=hp.get("batch_size", 2),
-                learning_rate=hp.get("learning_rate", 8e-6),
-                beta=hp.get("beta", 0.1),
-                bf16=True,
-            )
-            trainer = ORPOTrainer(model=inner, train_dataset=dataset, args=config, tokenizer=tokenizer)
-        elif method == "kto":
-            from trl import KTOConfig, KTOTrainer
-            config = KTOConfig(
-                output_dir=output_dir,
-                num_train_epochs=hp.get("n_epochs", 1),
-                per_device_train_batch_size=hp.get("batch_size", 2),
-                learning_rate=hp.get("learning_rate", 5e-6),
-                beta=hp.get("beta", 0.1),
-                bf16=True,
-            )
-            trainer = KTOTrainer(model=inner, train_dataset=dataset, args=config, tokenizer=tokenizer)
-        else:  # simpo
-            from trl import CPOConfig, CPOTrainer
-            config = CPOConfig(
-                output_dir=output_dir,
-                loss_type="simpo",
-                num_train_epochs=hp.get("n_epochs", 1),
-                per_device_train_batch_size=hp.get("batch_size", 2),
-                learning_rate=hp.get("learning_rate", 8e-6),
-                beta=hp.get("beta", 2.0),
-                bf16=True,
-            )
-            trainer = CPOTrainer(model=inner, train_dataset=dataset, args=config, tokenizer=tokenizer)
+        """DPO, ORPO, KTO or SimPO (TRL's CPO trainer with loss_type="simpo") on the local GPU."""
+        from langtune._trl_compat import load_trainer, make_config, make_trainer
 
+        name, default_lr, default_beta = FastLanguageModel._PREFERENCE_DEFAULTS[method]
+        TrainerCls, ConfigCls = load_trainer(name)
+        extra = {"loss_type": "simpo"} if method == "simpo" else {}
+        config = make_config(
+            ConfigCls,
+            output_dir=output_dir,
+            num_train_epochs=hp.get("n_epochs", 1),
+            per_device_train_batch_size=hp.get("batch_size", 2),
+            learning_rate=hp.get("learning_rate", default_lr),
+            beta=hp.get("beta", default_beta),
+            bf16=True,
+            **extra,
+        )
+        trainer = make_trainer(TrainerCls, tokenizer, model=inner, train_dataset=dataset, args=config)
         return trainer.train()
 
     # ── generate / chat ──────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Default API base URL
-DEFAULT_API_BASE = "https://api.langtrain.xyz/v1"
+DEFAULT_API_BASE = "https://api.langtrain.xyz/api/v1"
 
 
 class JobStatus(Enum):
@@ -134,10 +134,10 @@ class LangtuneClient:
         
         Args:
             api_key: API key (defaults to LANGTUNE_API_KEY env var)
-            base_url: API base URL (defaults to https://api.langtrain.xyz/v1)
+            base_url: API base URL (defaults to https://api.langtrain.xyz/api/v1)
             timeout: Request timeout in seconds
         """
-        self.api_key = api_key or os.environ.get("LANGTUNE_API_KEY")
+        self.api_key = api_key or os.environ.get("LANGTRAIN_API_KEY") or os.environ.get("LANGTUNE_API_KEY")
         self.base_url = (base_url or os.environ.get("LANGTUNE_API_BASE") or DEFAULT_API_BASE).rstrip("/")
         self.timeout = timeout
         
@@ -150,7 +150,7 @@ class LangtuneClient:
             "User-Agent": "langtune-python/0.1"
         }
         if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["X-API-Key"] = self.api_key
         return headers
     
     # ==================== API Key Validation ====================
@@ -174,7 +174,8 @@ class LangtuneClient:
             return {"valid": False, "error": "No API key configured"}
         
         try:
-            response = self._request("POST", "/auth/api-keys/validate", {"api_key": self.api_key})
+            from urllib.parse import quote
+            response = self._request("POST", f"/auth/api-keys/validate?api_key={quote(self.api_key)}")
             return response
         except Exception as e:
             return {"valid": False, "error": str(e)}
@@ -309,21 +310,21 @@ class LangtuneClient:
         # Upload training file first
         training_file_id = self._upload_file(training_file, "fine-tune")
         
+        # Field names follow the API server's FineTuneJobCreate schema.
         data = {
-            "training_file": training_file_id,
-            "model": model,
+            "base_model": model,
+            "dataset_id": training_file_id,
             "training_method": training_method
         }
-        
+
         if validation_file:
-            val_file_id = self._upload_file(validation_file, "fine-tune")
-            data["validation_file"] = val_file_id
+            logger.warning("validation_file is not supported by the API and is ignored")
         
         if hyperparameters:
             data["hyperparameters"] = hyperparameters
         
         if suffix:
-            data["suffix"] = suffix
+            data["name"] = suffix
         
         # Method-specific configs
         if sft_config and training_method == "sft":
@@ -333,22 +334,22 @@ class LangtuneClient:
         if rlhf_config and training_method == "rlhf":
             data["rlhf_config"] = rlhf_config
         
-        response = self._request("POST", "/fine-tuning/jobs", data)
+        response = self._request("POST", "/training/jobs", data)
         return self._parse_job(response)
     
     def get_finetune_job(self, job_id: str) -> FineTuneJob:
         """Get fine-tuning job status."""
-        response = self._request("GET", f"/fine-tuning/jobs/{job_id}")
+        response = self._request("GET", f"/training/jobs/{job_id}")
         return self._parse_job(response)
     
     def list_finetune_jobs(self, limit: int = 10) -> List[FineTuneJob]:
         """List fine-tuning jobs."""
-        response = self._request("GET", f"/fine-tuning/jobs?limit={limit}")
+        response = self._request("GET", f"/training/jobs?limit={limit}")
         return [self._parse_job(j) for j in response.get("data", [])]
     
     def cancel_finetune_job(self, job_id: str) -> FineTuneJob:
         """Cancel a fine-tuning job."""
-        response = self._request("POST", f"/fine-tuning/jobs/{job_id}/cancel")
+        response = self._request("POST", f"/training/jobs/{job_id}/cancel")
         return self._parse_job(response)
     
     def wait_for_job(
@@ -392,11 +393,11 @@ class LangtuneClient:
         return FineTuneJob(
             id=data["id"],
             status=JobStatus(data.get("status", "pending")),
-            model=data.get("model", ""),
+            model=(data.get("config") or {}).get("base_model", data.get("model", "")),
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at"),
-            completed_at=data.get("finished_at"),
-            error=data.get("error", {}).get("message") if data.get("error") else None,
+            completed_at=data.get("completed_at", data.get("finished_at")),
+            error=data.get("error_message"),
             result_url=data.get("result_files", [None])[0] if data.get("result_files") else None,
             metrics=data.get("metrics")
         )
