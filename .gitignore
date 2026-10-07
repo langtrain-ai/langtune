@@ -22,3 +22,6 @@ build/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# JS dependencies
+node_modules/
