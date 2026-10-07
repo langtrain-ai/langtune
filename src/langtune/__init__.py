@@ -7,7 +7,12 @@ This package provides tools and modules for efficient fine-tuning of large langu
 import os
 import sys
 
-__version__ = "0.1.2"
+# The version CI releases (pyproject.toml), not a copy that goes stale.
+try:
+    from importlib.metadata import version as _version
+    __version__ = _version("langtune")
+except Exception:  # running from a source tree that isn't installed
+    __version__ = "0.0.0"
 
 # Banner display control
 _BANNER_SHOWN = False
