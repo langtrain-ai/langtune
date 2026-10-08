@@ -103,7 +103,7 @@ langtune auth login
 
 ## 🆘 Getting Help
 
-1. Check existing [GitHub Issues](https://github.com/langtrain-ai/langtune/issues)
+1. Check existing [GitHub Issues](https://github.com/langtrain-ai/langtrain_langtune/issues)
 2. Open a new issue with:
    - Error message
    - Code to reproduce

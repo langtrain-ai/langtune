@@ -124,7 +124,7 @@ def _show_welcome_banner():
         banner_text.append(f"v{__version__}\n", style="cyan")
         banner_text.append(f"  🖥️  {gpu_info}\n", style=gpu_style)
         banner_text.append("  📚 Docs: ", style="dim")
-        banner_text.append("https://github.com/langtrain-ai/langtune\n", style="blue underline")
+        banner_text.append("https://github.com/langtrain-ai/langtrain_langtune\n", style="blue underline")
         
         # Quick start
         banner_text.append("\n  🚀 ", style="")

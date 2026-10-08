@@ -52,6 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.1.2]: https://github.com/langtrain-ai/langtune/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/langtrain-ai/langtune/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/langtrain-ai/langtune/releases/tag/v0.1.0
+[0.1.2]: https://github.com/langtrain-ai/langtrain_langtune/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/langtrain-ai/langtrain_langtune/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/langtrain-ai/langtrain_langtune/releases/tag/v0.1.0

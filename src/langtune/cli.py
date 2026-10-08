@@ -343,7 +343,7 @@ def info_command(args):
     table.add_row("large", "~100M+", "Production quality generation")
     
     console.print(table)
-    console.print("\n[muted]Docs: https://github.com/langtrain-ai/langtune[/]\n")
+    console.print("\n[muted]Docs: https://github.com/langtrain-ai/langtrain_langtune[/]\n")
     return 0
 
 
