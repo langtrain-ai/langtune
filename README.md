@@ -1,4 +1,4 @@
-> **Note:** `langtune` is now part of the unified [`langtrain`](https://github.com/langtrain-ai/langtrain-py) SDK.
+> **Note:** `langtune` is now part of the unified [`langtrain`](https://github.com/langtrain-ai/langtrain_py) SDK.
 > `pip install "langtrain-ai[train]"` adds AdaptiveRank and DatasetIntelligence on top of langtune.
 > langtune continues to receive updates and remains fully supported.
 
@@ -6,7 +6,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/langtrain-ai/langtune/main/static/langtune-white.png" alt="Langtune" width="400" />
+<img src="https://raw.githubusercontent.com/langtrain-ai/langtrain_langtune/main/static/langtune-white.png" alt="Langtune" width="400" />
 
 <h3>The fastest way to fine-tune LLMs</h3>
 
@@ -22,7 +22,7 @@
 <p>
   <a href="https://pypi.org/project/langtune/"><img src="https://img.shields.io/pypi/v/langtune.svg?style=for-the-badge&logo=pypi&logoColor=white" alt="PyPI" /></a>
   <a href="https://pepy.tech/project/langtune"><img src="https://img.shields.io/pepy/dt/langtune?style=for-the-badge&logo=python&logoColor=white&label=downloads" alt="Downloads" /></a>
-  <a href="https://github.com/langtrain-ai/langtune/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License" /></a>
+  <a href="https://github.com/langtrain-ai/langtrain_langtune/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="License" /></a>
 </p>
 
 <p>
@@ -42,7 +42,7 @@
 The fastest way to get started. Installs Langtune in an isolated environment.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/langtrain-ai/langtune/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/langtrain-ai/langtrain_langtune/main/scripts/install.sh | bash
 ```
 
 ### Or using pip

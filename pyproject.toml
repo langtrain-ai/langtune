@@ -77,11 +77,11 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/langtrain-ai/langtune"
-Documentation = "https://github.com/langtrain-ai/langtune/tree/main/docs"
-Repository = "https://github.com/langtrain-ai/langtune"
-Changelog = "https://github.com/langtrain-ai/langtune/blob/main/CHANGELOG.md"
-"Bug Tracker" = "https://github.com/langtrain-ai/langtune/issues"
+Homepage = "https://github.com/langtrain-ai/langtrain_langtune"
+Documentation = "https://github.com/langtrain-ai/langtrain_langtune/tree/main/docs"
+Repository = "https://github.com/langtrain-ai/langtrain_langtune"
+Changelog = "https://github.com/langtrain-ai/langtrain_langtune/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/langtrain-ai/langtrain_langtune/issues"
 
 [project.scripts]
 langtune = "langtune.cli:main"
